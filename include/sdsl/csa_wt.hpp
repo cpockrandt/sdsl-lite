@@ -49,7 +49,8 @@ template <class t_wt			   = wt_huff<>, // Wavelet tree type
 		  class t_sa_sample_strat  = sa_order_sa_sampling<>, // Policy class for the SA sampling.
 		  class t_isa_sample_strat = isa_sampling<>,		 // Policy class for ISA sampling.
 		  class t_alphabet_strat   = // Policy class for the representation of the alphabet.
-		  typename wt_alphabet_trait<t_wt>::type>
+		  typename wt_alphabet_trait<t_wt>::type,
+		  bool t_implicit_sentinel= false>
 class csa_wt {
 	static_assert(std::is_same<typename index_tag<t_wt>::type, wt_tag>::value,
 				  "First template argument has to be a wavelet tree type.");
@@ -68,6 +69,7 @@ class csa_wt {
 
 public:
 	enum { sa_sample_dens = t_dens, isa_sample_dens = t_inv_dens };
+	enum { implicit_sentinel = t_implicit_sentinel };
 
 	typedef uint64_t							 value_type;
 	typedef random_access_const_iterator<csa_wt> const_iterator;
@@ -105,6 +107,8 @@ private:
 	sa_sample_type  m_sa_sample;	// suffix array samples
 	isa_sample_type m_isa_sample;   // inverse suffix array samples
 	alphabet_type   m_alphabet;
+	size_type       m_sentinel_pos;
+
 //#define USE_CSA_CACHE
 #ifdef USE_CSA_CACHE
 	mutable fast_cache csa_cache;
@@ -115,6 +119,7 @@ public:
 	const typename alphabet_type::comp2char_type& comp2char	= m_alphabet.comp2char;
 	const typename alphabet_type::C_type&		  C			   = m_alphabet.C;
 	const typename alphabet_type::sigma_type&	 sigma		   = m_alphabet.sigma;
+	const size_type&                              sentinel_pos = m_sentinel_pos;
 	const psi_type								  psi		   = psi_type(*this);
 	const lf_type								  lf		   = lf_type(*this);
 	const bwt_type								  bwt		   = bwt_type(*this);
@@ -135,6 +140,7 @@ public:
 		, m_sa_sample(csa.m_sa_sample)
 		, m_isa_sample(csa.m_isa_sample)
 		, m_alphabet(csa.m_alphabet)
+		, m_sentinel_pos(csa.m_sentinel_pos)
 	{
 		m_isa_sample.set_vector(&m_sa_sample);
 	}
@@ -145,6 +151,7 @@ public:
 		, m_sa_sample(std::move(csa.m_sa_sample))
 		, m_isa_sample(std::move(csa.m_isa_sample))
 		, m_alphabet(std::move(csa.m_alphabet))
+		, m_sentinel_pos(std::move(csa.m_sentinel_pos))
 	{
 		m_isa_sample.set_vector(&m_sa_sample);
 	}
@@ -158,7 +165,7 @@ public:
          *  \par Time complexity
          *      \f$ \Order{1} \f$
          */
-	size_type size() const { return m_wavelet_tree.size(); }
+	size_type size() const { return m_wavelet_tree.size() + implicit_sentinel; }
 
 	//! Returns the largest size that csa_wt can ever have.
 	/*! Required for the Container Concept of the STL.
@@ -218,10 +225,10 @@ public:
 			m_isa_sample   = std::move(csa.m_isa_sample);
 			m_isa_sample.set_vector(&m_sa_sample);
 			m_alphabet = std::move(csa.m_alphabet);
+			m_sentinel_pos = std::move(csa.m_sentinel_pos);
 		}
 		return *this;
 	}
-
 
 	//! Serialize to a stream.
 	/*! \param out Output stream to write the data structure.
@@ -244,7 +251,18 @@ private:
          *  \par Time complexity
          *        \f$ \Order{\log |\Sigma|} \f$
          */
-	size_type rank_bwt(size_type i, const char_type c) const { return m_wavelet_tree.rank(i, c); }
+    size_type rank_bwt(size_type i, const char_type c) const
+    {
+        if (implicit_sentinel) {
+            if (c == 0) {
+                return i > m_sentinel_pos;
+            }
+            char_type cc = char2comp[c];
+            i = i - (i > m_sentinel_pos);
+            return m_wavelet_tree.rank(i, cc-1);
+        }
+        return m_wavelet_tree.rank(i, c);
+    }
 
 	// Calculates the position of the i-th c in the BWT of the original text.
 	/*
@@ -254,21 +272,26 @@ private:
          *  \par Time complexity
          *        \f$ \Order{t_{\Psi}} \f$
          */
-	size_type select_bwt(size_type i, const char_type c) const
-	{
-		assert(i > 0);
-		char_type cc = char2comp[c];
-		if (cc == 0 and c != 0) // character is not in the text => return size()
-			return size();
-		assert(cc != 255);
-		if (C[cc] + i - 1 < C[cc + 1]) {
-			return m_wavelet_tree.select(i, c);
-		} else
-			return size();
-	}
-};
+    size_type select_bwt(size_type i, const char_type c)const
+    {
+        assert(i > 0);
+        char_type cc = char2comp[c];
+        if (cc==0 and c!=0)  // character is not in the text => return size()
+            return size();
+        assert(cc != 255);
+        if (C[cc]+i-1 <  C[cc+1]) {
+            if (implicit_sentinel) {
+                if (c == 0)
+                    return m_sentinel_pos;
+                size_type res = m_wavelet_tree.select(i, cc-1);
+                return res + (res >= m_sentinel_pos);
+            }
+            return m_wavelet_tree.select(i, c);
+        } else
+            return size();
+    }
 
-// == template functions ==
+};
 
 template <class t_wt,
 		  uint32_t t_dens,
@@ -304,20 +327,47 @@ cache_config& config)
 	// }
 	{
 		auto event = memory_monitor::event("construct wavelet tree");
-		int_vector_buffer<alphabet_type::int_width> bwt_buf(
-		cache_file_name(key_bwt<alphabet_type::int_width>(), config));
-		m_wavelet_tree = wavelet_tree_type(bwt_buf.begin(), bwt_buf.end(), config.dir);
+		std::string bwt_file = cache_file_name(key_bwt<alphabet_type::int_width>(), config);
+		int_vector_buffer<alphabet_type::int_width> bwt_buf(bwt_file);
+
+		// size_type n = bwt_buf.size();
+
+		if (t_implicit_sentinel) {
+		    std::string id = "_" + util::to_string(util::pid()) + "_" + util::to_string(util::id());
+		    std::string tmp_bwt_file = bwt_file + id;
+		    {
+		        int_vector_buffer<alphabet_type::int_width> tmp_bwt_buf(tmp_bwt_file, std::ios::out);
+		        for (size_type i=0, j=0; i<bwt_buf.size(); ++i) {
+		            char_type c = bwt_buf[i];
+		            if (c > 0) {
+		                tmp_bwt_buf[j++] = char2comp[c]-1;
+		            } else {
+		                m_sentinel_pos = i;
+		            }
+		        }
+		        if (bwt_buf.size() != tmp_bwt_buf.size()+1) {
+		            std::cerr<<"Warning CSA construction: 0-byte filter did not remove exactly one symbol"<<std::endl;
+		        }
+		    }
+		    int_vector_buffer<alphabet_type::int_width> tmp_bwt_buf(tmp_bwt_file);
+		    wavelet_tree_type tmp_wt(tmp_bwt_buf, tmp_bwt_buf.size());
+		    m_wavelet_tree.swap(tmp_wt);
+		    tmp_bwt_buf.close();
+		    sdsl::remove(tmp_bwt_file);
+		} else {
+			m_wavelet_tree = wavelet_tree_type(bwt_buf.begin(), bwt_buf.end(), config.dir);
+		}
 	}
 }
-
 
 template <class t_wt,
 		  uint32_t t_dens,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
-inline auto csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>::
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
+inline auto csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>::
 operator[](size_type i) const -> value_type
 {
 	size_type off = 0;
@@ -338,8 +388,9 @@ template <class t_wt,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
-auto csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>::serialize(
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
+auto csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>::serialize(
 std::ostream& out, structure_tree_node* v, std::string name) const -> size_type
 {
 	structure_tree_node* child = structure_tree::add_child(v, name, util::class_name(*this));
@@ -348,6 +399,9 @@ std::ostream& out, structure_tree_node* v, std::string name) const -> size_type
 	written_bytes += m_sa_sample.serialize(out, child, "sa_samples");
 	written_bytes += m_isa_sample.serialize(out, child, "isa_samples");
 	written_bytes += m_alphabet.serialize(out, child, "alphabet");
+	if (implicit_sentinel) {
+		written_bytes +=  m_sentinel_pos.serialize(out, child, "sentinel_pos");
+	}
 	structure_tree::add_size(child, written_bytes);
 	return written_bytes;
 }
@@ -357,14 +411,18 @@ template <class t_wt,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
-void csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>::load(
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
+void csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>::load(
 std::istream& in)
 {
 	m_wavelet_tree.load(in);
 	m_sa_sample.load(in);
 	m_isa_sample.load(in, &m_sa_sample);
 	m_alphabet.load(in);
+	if (implicit_sentinel) {
+		m_sentinel_pos.load(in);
+	}
 }
 
 } // end namespace sdsl

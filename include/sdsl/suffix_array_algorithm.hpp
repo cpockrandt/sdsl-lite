@@ -248,9 +248,10 @@ template <class t_wt,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
 typename csa_wt<t_wt>::size_type bidirectional_search(
-const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>& csa_fwd,
+const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>& csa_fwd,
 typename csa_wt<>::size_type  l_fwd,
 typename csa_wt<>::size_type  r_fwd,
 typename csa_wt<>::size_type  l_bwd,
@@ -597,11 +598,24 @@ typename t_csa::size_type extract(const t_csa&				csa,
 		auto order	= csa.isa[end];
 		text[--steps] = first_row_symbol(order, csa);
 		while (steps != 0) {
+            if (t_csa::implicit_sentinel) {
+                if (order == csa.sentinel_pos) {
+                    order = 0;
+                    text[--steps] = 0;
+                    continue;
+                }
+                order = order - (order > csa.sentinel_pos);
+            }
 			auto rc		  = csa.wavelet_tree.inverse_select(order);
 			auto j		  = rc.first;
 			auto c		  = rc.second;
-			order		  = csa.C[csa.char2comp[c]] + j;
-			text[--steps] = c;
+            if (t_csa::implicit_sentinel) {
+                order = csa.C[ c+1 ] + j;
+                text[--steps] = csa.comp2char[c+1];
+            } else {
+                order = csa.C[ csa.char2comp[c] ] + j;
+                text[--steps] = c;
+            }
 		}
 	}
 	return end - begin + 1;

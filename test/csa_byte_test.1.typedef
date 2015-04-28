@@ -11,3 +11,4 @@ csa_sada<enc_vector<>, 32,32,text_order_sa_sampling<>,text_order_isa_sampling_su
 csa_wt<wt_huff<>, 8, 16, sa_order_sa_sampling<>>
 csa_wt<wt_huff<>, 8, 16, sa_order_sa_sampling<>, isa_sampling<>, succinct_byte_alphabet<bit_vector, rank_support_v<>, select_support_mcl<>>>
 csa_wt<wt_huff<>, 8, 16, sa_order_sa_sampling<>, isa_sampling<>, succinct_byte_alphabet<>>
+csa_wt<wt_huff<>, 8, 16, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet, true>

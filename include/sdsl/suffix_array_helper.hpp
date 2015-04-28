@@ -271,7 +271,15 @@ struct traverse_csa_wt_traits {
 	static value_type access(const t_csa& csa, size_type i)
 	{
 		char_type c = csa.F[i];
-		return csa.wavelet_tree.select(i - csa.C[csa.char2comp[c]] + 1, c);
+        if (t_csa::implicit_sentinel) {
+            if (c == 0) {
+                return csa.sentinel_pos;
+            }
+            auto cc = csa.char2comp[c];
+            auto pos = csa.wavelet_tree.select(i - csa.C[cc] + 1, cc-1);
+            return pos + (pos >= csa.sentinel_pos);
+        }
+        return csa.wavelet_tree.select(i - csa.C[csa.char2comp[c]] + 1 , c);
 	}
 };
 
@@ -283,11 +291,21 @@ struct traverse_csa_wt_traits<t_csa, false> {
 	typedef typename t_csa::size_type  size_type;
 	static value_type access(const t_csa& csa, size_type i)
 	{
-		typename t_csa::char_type c;
-		auto					  rc = csa.wavelet_tree.inverse_select(i);
-		size_type				  j  = rc.first;
-		c							 = rc.second;
-		return csa.C[csa.char2comp[c]] + j;
+		if (t_csa::implicit_sentinel) {
+			if (i == csa.sentinel_pos) {
+				return 0;
+			}
+			i = i - (i > csa.sentinel_pos);
+		}
+		// TODO: encapsulate inverse_select???
+		auto rc = csa.wavelet_tree.inverse_select(i);
+		auto j = rc.first;
+		auto c = rc.second;
+		if (t_csa::implicit_sentinel) {
+			return csa.C[ c+1 ] + j;
+		} else {
+			return csa.C[ csa.char2comp[c] ] + j;
+		}
 	}
 };
 
@@ -358,6 +376,12 @@ public:
 	value_type operator[](size_type i) const
 	{
 		assert(i < size());
+		if (t_csa::implicit_sentinel) {
+			if (i == m_csa.sentinel_pos) {
+				return 0;
+			}
+			return m_csa.comp2char[m_csa.wavelet_tree[i - (i>m_csa.sentinel_pos)]+1];
+		}
 		return m_csa.wavelet_tree[i];
 	}
 	//! Returns the size of the BWT function.

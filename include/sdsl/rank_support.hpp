@@ -109,6 +109,7 @@ struct rank_support_trait<1, 1> {
 
 	static uint32_t word_rank(const uint64_t* data, size_type idx)
 	{
+        std::cout << "data: " << *data << ", idx: " << idx << "\n"; // TODO: why not shift?
 		return bits::cnt(*(data + (idx >> 6)) & bits::lo_set[idx & 0x3F]);
 	}
 

@@ -28,6 +28,28 @@ matrix:
             - cmake
             - g++-5
 
+    - env: MYCC="gcc-6" MYCXX="g++-6" STDLIB=libstdc++
+      os: linux
+      addons: &gcc6
+        apt:
+          sources:
+            - kalakris-cmake
+            - ubuntu-toolchain-r-test
+          packages:
+            - cmake
+            - g++-6
+
+    - env: MYCC="gcc-7" MYCXX="g++-7" STDLIB=libstdc++
+      os: linux
+      addons: &gcc7
+        apt:
+          sources:
+            - kalakris-cmake
+            - ubuntu-toolchain-r-test
+          packages:
+            - cmake
+            - g++-7
+
 #    - env: MYCC="clang-3.7" MYCXX="clang++-3.7" STDLIB=libc++
 #      os: linux
 #      addons: &clang37
@@ -99,3 +121,7 @@ before_script:
 script:
   - cd ${TRAVIS_BUILD_DIR}
   - ./install.sh ..
+  - mkdir sdsl-lite-build && cd sdsl-lite-build
+  - cmake ${TRAVIS_BUILD_DIR}
+  - make test-sdsl
+  - make examples-sdsl

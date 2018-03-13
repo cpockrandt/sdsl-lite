@@ -302,17 +302,118 @@ public:
 	//! Constructor to fix possible comparison with integeres issue.
 	explicit int_vector(size_type size = 0) : int_vector(size, static_cast<value_type>(0), t_width)
 	{
-	}
+    }
 	//! Constructor for initializer_list.
-	template <class t_T>
-	int_vector(std::initializer_list<t_T> il) : int_vector(0, 0)
+	int_vector(std::initializer_list<value_type> il) : int_vector(0, 0)
 	{
-		resize(il.size());
-		size_type idx = 0;
-		for (auto x : il) {
-			(*this)[idx++] = x;
-		}
+        assign(il);
 	}
+
+	//! Constructor for iterators
+    template <typename input_iterator_t>
+	int_vector(
+        typename std::enable_if<
+            std::is_base_of<
+                std::input_iterator_tag, typename std::iterator_traits<input_iterator_t>::iterator_category
+            >::value,
+            input_iterator_t
+        >::type first,
+        input_iterator_t last) : int_vector(0, 0)
+	{
+        assign(first, last);
+	}
+
+    void clear()
+    {
+        resize(0); // TODO(cpockrandt): ok?
+    }
+
+    iterator erase(const_iterator q)
+    {
+        iterator q_nonconst = begin() + (q - cbegin());
+        std::copy(q_nonconst + 1, end(), q_nonconst);
+        resize(size() - 1);
+        return q_nonconst;
+    }
+
+    iterator erase(const_iterator q1, const_iterator q2)
+    {
+        iterator q1_nonconst = begin() + (q1 - cbegin());
+        iterator q2_nonconst = begin() + (q2 - cbegin());
+        std::copy(q2_nonconst, end(), q1_nonconst);
+        resize(size() - (q2 - q1));
+        return q1_nonconst;
+    }
+
+    iterator insert(const_iterator q, value_type x)
+    {
+        return insert(q, 1, x);
+    }
+
+    iterator insert(const_iterator q, size_type n, value_type v)
+    {
+        size_type pos = q - cbegin();
+        resize(size() + n);
+        iterator q_new = begin() + pos;
+        std::copy_backward(q_new, end() - n, end());
+        std::fill_n(q_new, n, v);
+        return q_new;
+    }
+
+    iterator insert(const_iterator q, std::initializer_list<value_type> il)
+    {
+        return insert(q, il.begin(), il.end());
+    }
+
+    template <typename input_iterator_t>
+    typename std::enable_if<
+        std::is_base_of<
+            std::input_iterator_tag, typename std::iterator_traits<input_iterator_t>::iterator_category
+        >::value,
+        iterator
+    >::type insert(const_iterator q,
+        input_iterator_t i, input_iterator_t j)
+    {
+        size_type pos = q - cbegin();
+        resize(size() + (j - i));
+        iterator q_new = begin() + pos;
+        std::copy_backward(q_new, end() - (j - i), end());
+        std::copy(i, j, q_new);
+        return q_new;
+    }
+
+    reference front()
+    {
+        return *begin();
+    }
+
+    const_reference front() const
+    {
+        return *cbegin();
+    }
+
+    reference back()
+    {
+        return *(end()-1);
+    }
+
+    const_reference back() const
+    {
+        return *(--cend());
+    }
+
+    void push_back(value_type v)
+    {
+        resize(size() + 1);
+        *(end() - 1) = v;
+    }
+
+    void pop_back()
+    {
+        resize(size() - 1);
+    }
+
+
 
 	//! Move constructor.
 	int_vector(int_vector&& v);
@@ -323,8 +424,40 @@ public:
 	//! Destructor.
 	~int_vector();
 
+    //! Assign.
+    void assign(size_type size, value_type default_value)
+    {
+    	resize(size);
+    	util::set_to_value(*this, default_value); // new initialization
+    }
+
+    //! Assign.
+    void assign(std::initializer_list<value_type> il)
+    {
+		resize(il.size());
+		size_type idx = 0;
+		for (auto x : il) {
+			(*this)[idx++] = x;
+		}
+    }
+
+    //! Assign.
+    template <typename input_iterator_t>
+    void assign(input_iterator_t first, input_iterator_t last)
+    {
+        assert(first < last);
+        resize(last - first);
+		size_type idx = 0;
+        while (first < last) {
+            (*this)[idx++] = *(first++);
+        }
+    }
+
 	//! Equivalent to size() == 0.
 	bool empty() const { return 0 == m_size; }
+
+    //! Swap method for int_vector.
+    void swap(int_vector& v);
 
 	//! Resize the int_vector in terms of elements.
 	/*! \param size The size to resize the int_vector in terms of elements.
@@ -393,7 +526,7 @@ public:
 	uint8_t width() const { return m_width; }
 
 	//! Sets the width of the integers which are accessed via the [] operator, if t_width equals 0.
-	/*! \param intWidth New width of the integers accessed via the [] operator.
+	/*! \param new_width New width of the integers accessed via the [] operator.
             \note This method has no effect if t_width is in the range [1..64].
               \sa width
         */
@@ -423,6 +556,24 @@ public:
          *  \return The value of the i-th integer of length width().
          */
 	inline const_reference operator[](const size_type& i) const;
+
+    //! non const version of at() function
+    /*! \param i Index the i-th integer of length width().
+         *  \return A reference to the i-th integer of length width().
+         */
+    reference at(const size_type& i)
+    {
+        return (*this)[i];
+    }
+
+    //! const version of at() function
+    /*! \param i Index the i-th integer of length width().
+         *  \return The value of the i-th integer of length width().
+         */
+    const_reference at(const size_type& i) const
+    {
+        return (*this)[i];
+    }
 
 	//! Assignment operator.
 	/*! \param v The vector v which should be assigned
@@ -496,6 +647,15 @@ public:
 
 	//! Const iterator that points to the element after the last element of int_vector.
 	const const_iterator end() const
+	{
+		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
+	}
+
+	//! Const iterator that points to the first element of the int_vector.
+	const const_iterator cbegin() { return int_vector_trait<t_width>::begin(this, m_data); }
+
+	//! Const iterator that points to the element after the last element of int_vector.
+	const const_iterator cend()
 	{
 		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
 	}
@@ -1130,12 +1290,12 @@ operator<<(std::ostream& os, const t_bv& bv)
 // ==== int_vector implementation  ====
 
 template <uint8_t t_width>
-inline int_vector<t_width>::int_vector(size_type size, value_type default_value, uint8_t intWidth)
-	: m_size(0), m_data(nullptr), m_width(t_width)
+inline int_vector<t_width>::int_vector(size_type size, value_type default_value, uint8_t int_width)
+       : m_size(0), m_data(nullptr), m_width(t_width)
 {
-	width(intWidth);
-	resize(size);
-	util::set_to_value(*this, default_value); // new initialization
+    width(int_width);
+    resize(size);
+    util::set_to_value(*this, default_value); // new initialization
 }
 
 template <uint8_t t_width>
@@ -1188,6 +1348,25 @@ int_vector<t_width>::~int_vector()
 {
 	memory_manager::clear(*this);
 }
+
+template<uint8_t t_width>
+void int_vector<t_width>::swap(int_vector& v)
+{
+    if (this != &v) { // if v and _this_ are not the same object
+        size_type size     = m_size;
+        uint64_t* data     = m_data;
+        uint8_t  int_width = m_width;
+        m_size   = v.m_size;
+        m_data   = v.m_data;
+        width(v.m_width);
+        v.m_size = size;
+        v.m_data = data;
+        v.width(int_width);
+    }
+}
+
+template<uint8_t t_width>
+void swap(int_vector<t_width>& v1, int_vector<t_width>& v2) { v1.swap(v2); } // TODO(cpockrandt): or exception?
 
 template <uint8_t t_width>
 void int_vector<t_width>::bit_resize(const size_type size)

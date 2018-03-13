@@ -423,7 +423,7 @@ private:
             coalesce_block(newblock);
         }
     }
-    
+
 	uint8_t* hsbrk(size_t size)
     {
         ptrdiff_t left = (ptrdiff_t)m_total_size - (m_top - m_base);
@@ -485,7 +485,7 @@ private:
         }
         return bptr;
     }
-        
+
 	mm_block_t* last_block()
     {
         mm_block_t* last = nullptr;
@@ -501,7 +501,7 @@ private:
         return last;
     }
 
-    
+
 	void print_heap()
     {
         mm_block_t* bptr = m_first_block;
@@ -757,6 +757,7 @@ public:
 	template <class t_vec>
 	static void resize(t_vec& v, const typename t_vec::size_type size)
 	{
+        const typename t_vec::size_type old_m_size = v.m_size;
 		uint64_t old_size_in_bytes = ((v.m_size + 63) >> 6) << 3;
 		uint64_t new_size_in_bytes = ((size + 63) >> 6) << 3;
 		bool	 do_realloc		   = old_size_in_bytes != new_size_in_bytes;
@@ -771,12 +772,16 @@ public:
 			if (allocated_bytes != 0 && v.m_data == nullptr) {
 				throw std::bad_alloc();
 			}
-			// update and fill with 0s
-			if (v.bit_size() < v.capacity()) {
-				uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());
-				uint8_t in_word_offset = (uint8_t)(v.bit_size() & 0x3F);
-				bits::write_int(v.m_data + (v.bit_size() >> 6), 0, in_word_offset, len);
-			}
+
+            // initialize expanded part with 0s
+            uint64_t old_size_in_64_bits = (old_m_size + 63) >> 6;
+            std::cout << "yaa?\n";
+            while (old_size_in_64_bits < (size + 63) >> 6) {
+                std::cout << "yaa!\n";
+                bits::write_int(v.m_data + old_size_in_64_bits, 0x1111111111111111 /*0ULL*/, 0, 64);
+                ++old_size_in_64_bits;
+            }
+
 			if (((v.m_size) % 64) == 0) { // initialize unreachable bits with 0
 				v.m_data[v.m_size / 64] = 0;
 			}
@@ -786,6 +791,13 @@ public:
 				memory_monitor::record((int64_t)new_size_in_bytes - (int64_t)old_size_in_bytes);
 			}
 		}
+
+        // set the last unused bits to 0
+        if (v.bit_size() < v.capacity()) {
+            uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());
+            uint8_t in_word_offset = (uint8_t)(v.bit_size() & 0x3F);
+            bits::write_int(v.m_data + (v.bit_size() >> 6), 0, in_word_offset, len);
+        }
 	}
 	template <class t_vec>
 	static void clear(t_vec& v)

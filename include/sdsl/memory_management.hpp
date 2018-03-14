@@ -755,12 +755,22 @@ public:
 #endif
 	}
 	template <class t_vec>
-	static void resize(t_vec& v, const typename t_vec::size_type size)
+	static void resize(t_vec& v, const typename t_vec::size_type size, const typename t_vec::value_type /*value = 0*/)
 	{
+        // const typename t_vec::size_type old_m_size = v.m_size;
 		uint64_t old_size_in_bytes = ((v.m_size + 63) >> 6) << 3;
 		uint64_t new_size_in_bytes = ((size + 63) >> 6) << 3;
 		bool	 do_realloc		   = old_size_in_bytes != new_size_in_bytes;
 		v.m_size				   = size;
+
+        // uint64_t init_pattern = value << (64 - v.m_width);
+        // for (uint8_t i = 1; i < 64 / v.m_width; ++i)
+        //     init_pattern |= init_pattern >> v.m_width;
+        // above code is equivalent and shorter than the code below
+        // uint64_t init_pattern = 0ULL;
+        // for (uint8_t i = 0; i < 64 / v.m_width; ++i)
+        //     init_pattern |= value << (64 - (i+1)*v.m_width));
+
 		if (do_realloc || v.m_data == nullptr) {
 			// Note that we allocate 8 additional bytes if m_size % 64 == 0.
 			// We need this padding since rank data structures do a memory
@@ -771,12 +781,22 @@ public:
 			if (allocated_bytes != 0 && v.m_data == nullptr) {
 				throw std::bad_alloc();
 			}
-			// update and fill with 0s
-			if (v.bit_size() < v.capacity()) {
-				uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());
-				uint8_t in_word_offset = (uint8_t)(v.bit_size() & 0x3F);
-				bits::write_int(v.m_data + (v.bit_size() >> 6), 0, in_word_offset, len);
-			}
+
+            // set the last unused bits to 0, and the ones before to 'value' if unallocated before
+            if (v.bit_size() < v.capacity()) {
+                uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());
+                uint8_t in_word_offset = (uint8_t)(v.bit_size() & 0x3F);
+                bits::write_int(v.m_data + (v.bit_size() >> 6), 0, in_word_offset, len);
+            }
+
+            // initialize expanded part with 'value'
+            // uint64_t idx = (old_m_size + 63) >> 6; // old size in number of words (64 bits)
+            // uint64_t new_size_in_words = (size + 63) >> 6;
+            // while (idx < new_size_in_words) {
+            //     bits::write_int(v.m_data + idx, init_pattern, 0, 64);
+            //     ++idx;
+            // }
+
 			if (((v.m_size) % 64) == 0) { // initialize unreachable bits with 0
 				v.m_data[v.m_size / 64] = 0;
 			}

@@ -325,7 +325,7 @@ public:
 
     void clear()
     {
-        resize(0); // TODO(cpockrandt): ok?
+        resize(0);
     }
 
     iterator erase(const_iterator q)
@@ -399,7 +399,7 @@ public:
 
     const_reference back() const
     {
-        return *(--cend());
+        return *(cend() - 1);
     }
 
     void push_back(value_type v)
@@ -632,33 +632,24 @@ public:
 	//! Iterator that points to the first element of the int_vector.
 	/*!  Time complexity guaranty is O(1).
          */
-	const iterator begin() { return int_vector_trait<t_width>::begin(this, m_data); }
+	iterator begin() { return int_vector_trait<t_width>::begin(this, m_data); }
 
 	//! Iterator that points to the element after the last element of int_vector.
 	/*! Time complexity guaranty is O(1).
          */
-	const iterator end()
-	{
-		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
-	}
+	iterator end() { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
 
 	//! Const iterator that points to the first element of the int_vector.
-	const const_iterator begin() const { return int_vector_trait<t_width>::begin(this, m_data); }
+	const_iterator begin() const { return int_vector_trait<t_width>::begin(this, m_data); }
 
 	//! Const iterator that points to the element after the last element of int_vector.
-	const const_iterator end() const
-	{
-		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
-	}
+	const_iterator end() const { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
 
 	//! Const iterator that points to the first element of the int_vector.
-	const const_iterator cbegin() { return int_vector_trait<t_width>::begin(this, m_data); }
+	const_iterator cbegin() const { return int_vector_trait<t_width>::begin(this, m_data); }
 
 	//! Const iterator that points to the element after the last element of int_vector.
-	const const_iterator cend()
-	{
-		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
-	}
+	const_iterator cend() const { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
 
 	//! Flip all bits of bit_vector
 	void flip()

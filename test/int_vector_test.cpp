@@ -5,6 +5,7 @@
 #include <string>
 #include <random>
 #include <algorithm>
+#include <chrono>
 
 namespace
 {
@@ -70,18 +71,18 @@ void test_Constructors(uint8_t template_width, size_type constructor_size, uint8
     }
     {
         // Constructor with two arguments
-        size_type expected_val = rng();
+        value_type expected_val = rng();
         t_iv iv(constructor_size, expected_val);
         ASSERT_EQ(constructor_size, iv.size());
         ASSERT_EQ(template_width, iv.width());
         expected_val &= sdsl::bits::lo_set[iv.width()];
         for (size_type j=0; j < iv.size(); ++j) { // should be initialized with expected_val
-            ASSERT_EQ(expected_val, (size_type)iv[j]);
+            ASSERT_EQ(expected_val, iv[j]);
         }
     }
     {
         // Constructor with three arguments
-        size_type expected_val = rng();
+        value_type expected_val = rng();
         t_iv iv(constructor_size, expected_val, constructor_width);
         ASSERT_EQ(constructor_size, iv.size());
         if (iv.fixed_int_width == 0) {
@@ -91,7 +92,7 @@ void test_Constructors(uint8_t template_width, size_type constructor_size, uint8
         }
         expected_val &= sdsl::bits::lo_set[iv.width()];
         for (size_type j=0; j < iv.size(); ++j) { // should be initialized with expected_val
-            ASSERT_EQ(expected_val, (size_type)iv[j]);
+            ASSERT_EQ(expected_val, iv[j]);
         }
     }
     {
@@ -278,7 +279,11 @@ template<class t_iv>
 void test_AssignAndResize(uint64_t size, uint8_t width)
 {
     typedef typename t_iv::value_type value_type;
-    std::mt19937_64 rng;
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+
+    std::mt19937_64 rng(ns);
     {
         // assign(size, value)
         t_iv iv(size, rng(), width);
@@ -287,7 +292,7 @@ void test_AssignAndResize(uint64_t size, uint8_t width)
         iv.assign(new_size, expected_val);
         ASSERT_EQ(iv.size(), new_size);
         for (size_type j=0; j < iv.size(); ++j)
-            ASSERT_EQ(expected_val, (value_type)iv[j]);
+            ASSERT_EQ(expected_val, iv[j]);
     }
     {
         // assign(initializer_list)
@@ -307,37 +312,39 @@ void test_AssignAndResize(uint64_t size, uint8_t width)
         for (auto it = iv2.begin(); it != iv2.end(); ++it)
             ASSERT_EQ(*it, iv[it - iv2.begin() + size/4]);
     }
-    // {
-    //     // resize(size)
-    //     t_iv iv(size, 0, width);
-    //     sdsl::util::set_to_id(iv);
-    //     uint64_t new_size = std::max((size_type)0, size + (rng() % 100) - 50); // increase or decrease randomly
-    //     iv.resize(new_size);
-    //     ASSERT_EQ(iv.size(), new_size);
-    //     for (size_type j=0; j < std::min(size, new_size); ++j)
-    //         ASSERT_EQ((value_type)j & sdsl::bits::lo_set[iv.width()], (value_type)iv[j]); // old values
-    //     for (size_type j=size; j < new_size; ++j)
-    //         ASSERT_EQ((value_type)0, (value_type)iv[j]); // new values
-    // }
-    // {
-    //     // resize(size, v)
-    //     t_iv iv(size, 0, width);
-    //     sdsl::util::set_to_id(iv);
-    //     value_type expected_val = rng() & sdsl::bits::lo_set[iv.width()];
-    //     uint64_t new_size = std::max((size_type)0, size + (rng() % 100) - 50); // increase or decrease randomly
-    //     iv.resize(new_size, expected_val);
-    //     ASSERT_EQ(iv.size(), new_size);
-    //     for (size_type j=0; j < std::min(size, new_size); ++j)
-    //         ASSERT_EQ((value_type)j & sdsl::bits::lo_set[iv.width()], (value_type)iv[j]); // old values
-    //     for (size_type j=size; j < new_size; ++j)
-    //         ASSERT_EQ(expected_val, (value_type)iv[j]); // new values
-    // }
+    {
+        // resize(size)
+        value_type val = rng() & sdsl::bits::lo_set[width];
+        t_iv iv(size, val, width);
+        uint64_t new_size = std::max((size_type)0, size + (rng() % 100) - 50); // increase or decrease randomly
+        iv.resize(new_size);
+        ASSERT_EQ(iv.size(), new_size);
+        for (size_type j=0; j < std::min(size, new_size); ++j)
+            ASSERT_EQ(val, iv[j]); // old values
+        for (size_type j=size; j < new_size; ++j)
+            ASSERT_EQ((value_type)0, iv[j]); // new values
+    }
+    {
+        // resize(size, v)
+        size = 50;
+        value_type val1 = rng() & sdsl::bits::lo_set[width];
+        value_type val2 = rng() & sdsl::bits::lo_set[width];
+        t_iv iv(size, val1, width);
+        uint64_t new_size = std::max((size_type)0, size + (rng() % 100) - 50); // increase or decrease randomly
+        iv.resize(new_size, val2);
+        ASSERT_EQ(iv.size(), new_size);
+        for (size_type j=0; j < std::min(size, new_size); ++j)
+            ASSERT_EQ(val1, iv[j]); // old values
+        for (size_type j=size; j < new_size; ++j)
+            ASSERT_EQ(val2, iv[j]); // new values
+    }
     {
         // clear()
         t_iv iv(size, rng(), width);
+        size_type old_bit_capacity = iv.bit_capacity();
         iv.clear();
         ASSERT_EQ(iv.size(), (size_type)0);
-        ASSERT_EQ(iv.capacity(), (size_type)0);
+        ASSERT_EQ(iv.bit_capacity(), old_bit_capacity);
     }
 }
 

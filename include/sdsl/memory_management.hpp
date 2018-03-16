@@ -15,6 +15,7 @@
 #include "ram_fs.hpp"
 #include <chrono>
 #include <algorithm>
+#include <bitset>
 
 namespace sdsl {
 
@@ -423,7 +424,7 @@ private:
             coalesce_block(newblock);
         }
     }
-    
+
 	uint8_t* hsbrk(size_t size)
     {
         ptrdiff_t left = (ptrdiff_t)m_total_size - (m_top - m_base);
@@ -485,7 +486,7 @@ private:
         }
         return bptr;
     }
-        
+
 	mm_block_t* last_block()
     {
         mm_block_t* last = nullptr;
@@ -501,7 +502,7 @@ private:
         return last;
     }
 
-    
+
 	void print_heap()
     {
         mm_block_t* bptr = m_first_block;
@@ -755,86 +756,27 @@ public:
 #endif
 	}
 	template <class t_vec>
-	static void resize(t_vec& v, const typename t_vec::size_type size, const typename t_vec::value_type value = 0)
+	static void resize(t_vec& v, const typename t_vec::size_type capacity)
 	{
-        const typename t_vec::size_type old_size = v.m_size;
-		uint64_t old_size_in_bytes = ((v.m_size + 63) >> 6) << 3;
-		uint64_t new_size_in_bytes = ((size + 63) >> 6) << 3;
-		bool	 do_realloc		   = old_size_in_bytes != new_size_in_bytes;
-		v.m_size				   = size;
-
-        // TODO(cpockrandt): optimize for value = 0
-        uint64_t init_pattern = value;
-        uint8_t  shift_step   = v.m_width;
-        uint8_t  left_shift   = (64 / v.m_width) * v.m_width;
-        uint8_t  right_shift  = 64 - leftShift;
-        // constructs a 64-bit pattern with all characters set to 'value' in log iterations (including partially at the border)
-        for (uint8_t i = 0; shift_step < 64; ++i)
-        {
-            init_pattern |= init_pattern << shift_step;
-            shift_step <<= 1; // * 2
-        }
-
-        // initialize expanded part with 'value'
-        // TODO: test 2 edge cases. vorher volles wort (geht er dann überhaupt hier rein?)
-        // 2. case: hinterher volles wort.
-        if (/*!do_realloc && */size > old_size) // egal ob neue Wörter hinzukommen, oder nicht. Die ungenutzten Bits des zuvor letzten Wortes komplett mit 'value' auffüllen
-        {
-            uint8_t in_word_offset = (uint8_t)((old_size * v.m_width) & 0x3F);
-            uint8_t len = 64 - in_word_offset;
-            if (do_realloc)
-                bits_impl<T>::write_int(v.m_data + ((old_size * v.m_width) >> 6), init_pattern, in_word_offset, len); // fill everything with value from offset
-            else
-                bits_impl<T>::write_int(v.m_data + ((old_size * v.m_width) >> 6), init_pattern & lo_set[(size - old_size) * v.m_width], in_word_offset, len); // fill value starting from offset, followed by zeros for unallocated bits
-
-            // uint8_t padding = (v.m_width * old_size) & 0x3F;
-            // v.m_data[...] &= lo_set[padding]; // set all previously unused to 0
-            // uint8_t padding2 = (v.m_width * size) & 0x3F;
-            // if (padding2 == 0)
-            //     padding2 = 64;
-            // v.m_data[...] |= (init_pattern << padding) & lo_set[padding2]; // set all new values to 'value' and leave the unused to 0
-        }
+		uint64_t old_capacity_in_bytes = ((v.m_capacity + 63) >> 6) << 3;
+		uint64_t new_capacity_in_bytes = ((capacity + 63) >> 6) << 3;
+		bool	 do_realloc		   = old_capacity_in_bytes != new_capacity_in_bytes;
+		v.m_capacity      		   = ((capacity + 63) >> 6) << 6; // set new_capacity to a multiple of 64
 
 		if (do_realloc || v.m_data == nullptr) {
-			// Note that we allocate 8 additional bytes if m_size % 64 == 0.
+			// Note that we allocate 8 additional bytes if m_capacity % 64 == 0.
 			// We need this padding since rank data structures do a memory
-			// access to this padding to answer rank(size()) if size()%64 ==0.
+			// access to this padding to answer rank(capacity()) if capacity()%64 ==0.
 			// Note that this padding is not counted in the serialize method!
-			size_t allocated_bytes = (size_t)(((size + 64) >> 6) << 3);
+			size_t allocated_bytes = (size_t)(((v.m_capacity + 64) >> 6) << 3);
 			v.m_data			   = memory_manager::realloc_mem(v.m_data, allocated_bytes);
 			if (allocated_bytes != 0 && v.m_data == nullptr) {
 				throw std::bad_alloc();
 			}
 
-            uint64_t idx = (old_size + 63) >> 6; // old size in number of words (64 bits)
-            uint64_t new_size_in_words = (size + 63) >> 6;
-            uint8_t  shift = ((old_size * v.m_width) & 0x3F) % v.m_width; // letztes halbvolles word
-            if (shift > 0)
-                init_pattern = (init_pattern << shift) | (init_pattern >> (64 - shift));
-            shift = 64 % v.m_width;
-            while (idx < new_size_in_words) {
-                // cyclic shift
-                if (shift > 0)
-                    init_pattern = (init_pattern << shift) | (init_pattern >> (64 - shift));
-                v.m_data[idx] = init_pattern;
-                // bits::write_int(v.m_data + idx, init_pattern, 0, 64);
-                ++idx;
-            }
-
-            // set the last unused bits to 0, and the ones before to 'value' if unallocated before
-            if (v.bit_size() < v.capacity()) {
-                uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());
-                uint8_t in_word_offset = (uint8_t)(v.bit_size() & 0x3F);
-                bits::write_int(v.m_data + (v.bit_size() >> 6), 0, in_word_offset, len);
-            }
-
-			if (((v.m_size) % 64) == 0) { // initialize unreachable bits with 0
-				v.m_data[v.m_size / 64] = 0;
-			}
-
 			// update stats
 			if (do_realloc) {
-				memory_monitor::record((int64_t)new_size_in_bytes - (int64_t)old_size_in_bytes);
+				memory_monitor::record((int64_t)new_capacity_in_bytes - (int64_t)old_capacity_in_bytes);
 			}
 		}
 	}

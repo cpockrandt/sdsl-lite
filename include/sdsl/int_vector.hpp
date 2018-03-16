@@ -445,7 +445,10 @@ public:
 	bool empty() const { return 0 == m_size; }
 
     //! Swap method for int_vector.
-    void swap(int_vector& v);
+    void swap(int_vector& v)
+    {
+        std::swap(v, *this);
+    }
 
 	//! Resize the int_vector in terms of elements. If the current size is smaller than size, the additional elements are initialized with 0.
 	/*! \param size The size to resize the int_vector in terms of elements.
@@ -1338,25 +1341,6 @@ int_vector<t_width>::~int_vector()
 {
 	memory_manager::clear(*this);
 }
-
-template<uint8_t t_width>
-void int_vector<t_width>::swap(int_vector& v)
-{
-    if (this != &v) { // if v and _this_ are not the same object
-        size_type size     = m_size;
-        uint64_t* data     = m_data;
-        uint8_t  int_width = m_width;
-        m_size   = v.m_size;
-        m_data   = v.m_data;
-        width(v.m_width);
-        v.m_size = size;
-        v.m_data = data;
-        v.width(int_width);
-    }
-}
-
-template<uint8_t t_width>
-void swap(int_vector<t_width>& v1, int_vector<t_width>& v2) { v1.swap(v2); } // TODO(cpockrandt): or exception?
 
 template <uint8_t t_width> // TODO(cpockrandt): why outside?
 void int_vector<t_width>::bit_resize(const size_type size)

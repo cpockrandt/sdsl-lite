@@ -552,6 +552,7 @@ void util::set_to_value(t_int_vec& v, uint64_t k)
 	vec[0]			 = 0;
 	uint8_t  offset  = 0;
 	uint64_t n = 0, vals = 0;
+	// TODO(cpockrandt): improve to log iterations + number of cyclic shifts
 	do { // loop terminates after at most 64 iterations
 		vec[n] = vec[n] | (k << offset);
 		offset += int_width;

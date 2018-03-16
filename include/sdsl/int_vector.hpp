@@ -289,6 +289,9 @@ private:
 	uint64_t*	  m_data;  //!< Pointer to the memory for the bits.
 	int_width_type m_width; //!< Width of the integers.
 
+	// Hidden, since number of bits (size) does not go well together with int value.
+	void bit_resize(const size_type size, const value_type value);
+
 public:
 	//! Constructor for int_vector.
 	/*! \param size          Number of elements. Default value is 0.
@@ -299,20 +302,161 @@ public:
 
 	int_vector(size_type size, value_type default_value, uint8_t int_width = t_width);
 
-	//! Constructor to fix possible comparison with integeres issue.
+	//! Constructor
+	/*! \param size Number of elements to be allocated.
+	 */
 	explicit int_vector(size_type size = 0) : int_vector(size, static_cast<value_type>(0), t_width)
 	{
 	}
+
 	//! Constructor for initializer_list.
-	template <class t_T>
-	int_vector(std::initializer_list<t_T> il) : int_vector(0, 0)
+	/*! \param il initializer list.
+	 */
+	int_vector(std::initializer_list<value_type> il) : int_vector(0, 0)
 	{
-		resize(il.size());
-		size_type idx = 0;
-		for (auto x : il) {
-			(*this)[idx++] = x;
-		}
+		assign(il);
 	}
+
+	//! Constructor for iterator range
+	/*! \param first Iterator pointing to first element to be copied.
+           \param last  Iterator pointing to the element behind the last one to be copied.
+	 */
+	template <typename input_iterator_t>
+	int_vector(
+		typename std::enable_if<
+			std::is_base_of<
+				std::input_iterator_tag, typename std::iterator_traits<input_iterator_t>::iterator_category
+			>::value,
+			input_iterator_t
+		>::type first,
+		input_iterator_t last) : int_vector(0, 0)
+	{
+		assign(first, last);
+	}
+
+	//! Clearing the int_vector. Equal to resize(0).
+	/*! \sa resize
+	 */
+	void clear() { resize(0); }
+
+	//! Remove element that iterator is pointing to.
+	/*! \param it Iterator pointing to an element in int_vector
+	 */
+	iterator erase(const_iterator it)
+	{
+		iterator it_nonconst = begin() + (it - cbegin());
+		std::copy(it_nonconst + 1, end(), it_nonconst);
+		resize(size() - 1); // TODO(cpockrandt): std::ignore
+		return it_nonconst;
+	}
+
+	//! Remove elements in given iterator range.
+	/*! \param first Iterator pointing to first element to be deleted.
+           \param last  Iterator pointing to the elemnt after the one to be deleted.
+	 */
+	iterator erase(const_iterator first, const_iterator last)
+	{
+		iterator first_nonconst = begin() + (first - cbegin());
+		iterator last_nonconst = begin() + (last - cbegin());
+		std::copy(last_nonconst, end(), first_nonconst);
+		resize(size() - (last - first)); // TODO(cpockrandt): std::ignore
+		return first_nonconst;
+	}
+
+	//! Insert an element constructed with std::forward<Args>(args) before the element that the iterator is pointing to.
+	/*! \param it   Iterator pointing to an element in int_vector.
+           \param args Function parameter pack.
+	 */
+	template <class... Args>
+	iterator emplace(const_iterator it, Args&&... args)
+	{
+		return insert(it, 1, value_type(std::forward<Args>(args) ...));
+	}
+
+	//! Insert an element before the element that the iterator is pointing to.
+	/*! \param it    Iterator pointing to an element in int_vector.
+           \param value Element to be inserted.
+	 */
+	iterator insert(const_iterator it, value_type value) { return insert(it, 1, value); }
+
+	//! Insert n copies of an element before the element that the iterator is pointing to.
+	/*! \param it    Iterator pointing to an element in int_vector.
+           \param n     Number of copies.
+           \param value Element to be inserted.
+	 */
+	iterator insert(const_iterator it, size_type n, value_type value)
+	{
+		size_type pos = it - cbegin();
+		resize(size() + n); // TODO(cpockrandt): std::ignore
+		iterator it_new = begin() + pos;
+		std::copy_backward(it_new, end() - n, end());
+		std::fill_n(it_new, n, value);
+		return it_new;
+	}
+
+	//! Insert elements from intializer_list before the element that the iterator is pointing to.
+	/*! \param it Iterator pointing to an element in int_vector.
+           \param il Elements to be inserted.
+	 */
+	iterator insert(const_iterator it, std::initializer_list<value_type> il)
+	{
+		return insert(it, il.begin(), il.end());
+	}
+
+	//! Insert elements from an iterator pair before the element that the iterator `it` is pointing to.
+	/*! \param it    Iterator pointing to an element in int_vector.
+           \param first Iterator pointing to first element to be inserted.
+           \param last  Iterator pointing to the elemnt after the one to be inserted.
+	 */
+	template <typename input_iterator_t>
+	typename std::enable_if<
+		std::is_base_of<
+			std::input_iterator_tag, typename std::iterator_traits<input_iterator_t>::iterator_category
+		>::value,
+		iterator
+	>::type insert(const_iterator it,
+		input_iterator_t first, input_iterator_t last)
+	{
+		size_type pos = it - cbegin();
+		resize(size() + (last - first)); // TODO(cpockrandt): std::ignore
+		iterator it_new = begin() + pos;
+		std::copy_backward(it_new, end() - (last - first), end());
+		std::copy(first, last, it_new);
+		return it_new;
+	}
+
+	//! Returns first element.
+	reference front() { return *begin(); }
+
+	//! Returns first element.
+	const_reference front() const { return *cbegin(); }
+
+	//! Returns last element.
+	reference back() { return *(end()-1); }
+
+	//! Returns last element.
+	const_reference back() const { return *(cend() - 1); }
+
+	//! Insert an element constructed with std::forward<Args>(args) at the end.
+	/*! \param args Function parameter pack.
+	 */
+	template <class... Args>
+	void emplace_back(Args&&... args)
+	{
+		push_back(value_type(std::forward<Args>(args) ...));
+	}
+
+	//! Insert element at the end.
+	/*! \param value Element to be inserted.
+	 */
+	void push_back(value_type value)
+	{
+		resize(size() + 1); // TODO(cpockrandt): std::ignore
+		*(end() - 1) = value;
+	}
+
+	//! Remove element at the end.
+	void pop_back() { resize(size() - 1); } // TODO(cpockrandt): std::ignore
 
 	//! Move constructor.
 	int_vector(int_vector&& v);
@@ -323,15 +467,61 @@ public:
 	//! Destructor.
 	~int_vector();
 
+	//! Assign. Resize int_vector to `size` and fill elements with `default_value`.
+	/*! \param size Number of elements.
+           \param default_value Elements to be inserted.
+	 */
+	void assign(size_type size, value_type default_value)
+	{
+		resize(size); // TODO(cpockrandt): std::ignore
+		util::set_to_value(*this, default_value); // new initialization
+	}
+
+	//! Assign. Resize int_vector and initialize with initializer_list.
+	/*! \param il Initializer_list.
+	 */
+	void assign(std::initializer_list<value_type> il)
+	{
+		resize(il.size()); // TODO(cpockrandt): std::ignore
+		size_type idx = 0;
+		for (auto x : il) {
+			(*this)[idx++] = x;
+		}
+	}
+
+	//! Assign. Resize int_vector and initialize by copying from an iterator range.
+	/*! \param first Iterator pointing to first element to be inserted.
+           \param last  Iterator pointing to the elemnt after the one to be inserted.
+	 */
+	template <typename input_iterator_t>
+	void assign(input_iterator_t first, input_iterator_t last)
+	{
+		assert(first < last);
+		resize(last - first); // TODO(cpockrandt): std::ignore
+		size_type idx = 0;
+		while (first < last) {
+			(*this)[idx++] = *(first++);
+		}
+	}
+
 	//! Equivalent to size() == 0.
 	bool empty() const { return 0 == m_size; }
 
+	//! Swap method for int_vector.
+	void swap(int_vector& v) { std::swap(v, *this); }
+
+	//! Resize the int_vector in terms of elements. If the current size is smaller than `size`, the additional elements are initialized with 0.
+	/*! \param size Number of elements.
+	 */
+	void resize(const size_type size) { resize(size, 0); }
+
 	//! Resize the int_vector in terms of elements.
 	/*! \param size The size to resize the int_vector in terms of elements.
-         */
-	void resize(const size_type size) { bit_resize(size * width()); }
+        \param value If the current size is smaller than `size`, the additional elements are initialized with value.
+	 */
+	void resize(const size_type size, const value_type value) { bit_resize(size * width(), value); }
 
-	//! Resize the int_vector in terms of bits.
+	//! Resize the int_vector in terms of bits. If the current size is smaller than `size`, the additional bits are initialized with 0.
 	/*! \param size The size to resize the int_vector in terms of bits.
          */
 	void bit_resize(const size_type size);
@@ -393,7 +583,7 @@ public:
 	uint8_t width() const { return m_width; }
 
 	//! Sets the width of the integers which are accessed via the [] operator, if t_width equals 0.
-	/*! \param intWidth New width of the integers accessed via the [] operator.
+	/*! \param new_width New width of the integers accessed via the [] operator.
             \note This method has no effect if t_width is in the range [1..64].
               \sa width
         */
@@ -423,6 +613,18 @@ public:
          *  \return The value of the i-th integer of length width().
          */
 	inline const_reference operator[](const size_type& i) const;
+
+	//! non const version of at() function
+	/*! \param i Index the i-th integer of length width().
+           \return A reference to the i-th integer of length width().
+	 */
+	reference at(const size_type& i) { return (*this)[i]; }
+
+	//! const version of at() function
+	/*! \param i Index the i-th integer of length width().
+           \return The value of the i-th integer of length width().
+	 */
+	const_reference at(const size_type& i) const { return (*this)[i]; }
 
 	//! Assignment operator.
 	/*! \param v The vector v which should be assigned
@@ -481,24 +683,24 @@ public:
 	//! Iterator that points to the first element of the int_vector.
 	/*!  Time complexity guaranty is O(1).
          */
-	const iterator begin() { return int_vector_trait<t_width>::begin(this, m_data); }
+	iterator begin() { return int_vector_trait<t_width>::begin(this, m_data); }
 
 	//! Iterator that points to the element after the last element of int_vector.
 	/*! Time complexity guaranty is O(1).
          */
-	const iterator end()
-	{
-		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
-	}
+	iterator end() { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
 
 	//! Const iterator that points to the first element of the int_vector.
-	const const_iterator begin() const { return int_vector_trait<t_width>::begin(this, m_data); }
+	const_iterator begin() const { return int_vector_trait<t_width>::begin(this, m_data); }
 
 	//! Const iterator that points to the element after the last element of int_vector.
-	const const_iterator end() const
-	{
-		return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width));
-	}
+	const_iterator end() const { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
+
+	//! Const iterator that points to the first element of the int_vector.
+	const_iterator cbegin() const { return int_vector_trait<t_width>::begin(this, m_data); }
+
+	//! Const iterator that points to the element after the last element of int_vector.
+	const_iterator cend() const { return int_vector_trait<t_width>::end(this, m_data, (m_size / m_width)); }
 
 	//! Flip all bits of bit_vector
 	void flip()
@@ -1130,10 +1332,10 @@ operator<<(std::ostream& os, const t_bv& bv)
 // ==== int_vector implementation  ====
 
 template <uint8_t t_width>
-inline int_vector<t_width>::int_vector(size_type size, value_type default_value, uint8_t intWidth)
+inline int_vector<t_width>::int_vector(size_type size, value_type default_value, uint8_t int_width)
 	: m_size(0), m_data(nullptr), m_width(t_width)
 {
-	width(intWidth);
+	width(int_width);
 	resize(size);
 	util::set_to_value(*this, default_value); // new initialization
 }
@@ -1190,9 +1392,12 @@ int_vector<t_width>::~int_vector()
 }
 
 template <uint8_t t_width>
-void int_vector<t_width>::bit_resize(const size_type size)
+void int_vector<t_width>::bit_resize(const size_type size) { bit_resize(size, 0); }
+
+template <uint8_t t_width>
+void int_vector<t_width>::bit_resize(const size_type size, const value_type value)
 {
-	memory_manager::resize(*this, size);
+	memory_manager::resize(*this, size, value);
 }
 
 template <uint8_t t_width>

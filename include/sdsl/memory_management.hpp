@@ -755,12 +755,53 @@ public:
 #endif
 	}
 	template <class t_vec>
-	static void resize(t_vec& v, const typename t_vec::size_type size)
+	static void resize(t_vec& v, const typename t_vec::size_type size, const typename t_vec::value_type value = 0)
 	{
+		const typename t_vec::size_type old_size = v.m_size;
 		uint64_t old_size_in_bytes = ((v.m_size + 63) >> 6) << 3;
 		uint64_t new_size_in_bytes = ((size + 63) >> 6) << 3;
 		bool	 do_realloc		   = old_size_in_bytes != new_size_in_bytes;
 		v.m_size				   = size;
+
+		// TODO(cpockrandt): optimize for value = 0
+
+		// TODO: improve running time to log iterations + number of cyclic shifts
+		uint64_t k = value & bits::all_set >> (64 - v.m_width);
+		uint64_t vec[67] = {0}; // allocate memory for the mask and initialize with zeros
+		vec[0]			 = 0;
+		uint8_t  offset  = 0;
+		uint64_t n = 0, vals = 0;
+		do { // loop terminates after at most 64 iterations
+			vec[n] = vec[n] | (k << offset);
+			offset += v.m_width;
+			vals++;
+			if (offset >= 64) {
+				vec[n + 1] = 0;
+				vec[++n] = k >> (v.m_width - (offset - 64));
+				offset -= 64;
+			}
+		} while (offset != 0);
+
+		// constructs a 64-bit pattern with all characters set to 'value' in log iterations (including maybe a partial 'value' at the end)
+		// uint64_t init_pattern = value;
+		// for (uint8_t shift_step = v.m_width; shift_step < 64; shift_step <<= 1) {
+		//     init_pattern |= init_pattern << shift_step;
+		// }
+
+		uint8_t in_word_offset = (uint8_t)(old_size & 0x3F);
+		if (size > old_size && in_word_offset != 0) { // egal ob neue Wörter hinzukommen, oder nicht. Die ungenutzten Bits des zuvor letzten Wortes komplett mit 'value' auffüllen. offset darf nicht 0 sein, sonst ist der Speicher noch nicht alloziiert!
+			uint8_t len = 64 - in_word_offset;
+			uint64_t partial_pattern = vec[0];
+			if (!do_realloc) {
+				partial_pattern &= bits::lo_set[size - old_size]; // only have the lowest bits set, the unallocated area will be set to 0
+			}
+			bits::write_int(v.m_data + (old_size >> 6), partial_pattern, in_word_offset, len); // fill everything with value from offset (maybe excluding unallocated bits if !do_realloc)
+		}
+
+		// if (!do_realloc)
+		//     for (uint64_t i = old_size / v.m_width; i < size / v.m_width; ++i)
+		//         v[i] = value;
+
 		if (do_realloc || v.m_data == nullptr) {
 			// Note that we allocate 8 additional bytes if m_size % 64 == 0.
 			// We need this padding since rank data structures do a memory
@@ -771,6 +812,16 @@ public:
 			if (allocated_bytes != 0 && v.m_data == nullptr) {
 				throw std::bad_alloc();
 			}
+
+			// for (uint64_t i = old_size / v.m_width; i < size / v.m_width; ++i)
+			//     v[i] = value;
+			uint64_t idx = (old_size + 63) >> 6; // old size in number of words (64 bits)
+			uint64_t new_size_in_words = (size + 63) >> 6;
+			while (idx < new_size_in_words) {
+				v.m_data[idx] = vec[idx % n];
+				++idx;
+			}
+
 			// update and fill with 0s
 			if (v.bit_size() < v.capacity()) {
 				uint8_t len			   = (uint8_t)(v.capacity() - v.bit_size());

@@ -157,25 +157,82 @@ public:
 		}
 	}
 
-	template <typename uintX_t>
-    static size_type set_positions(uintX_t w, const value_type v)
+    static size_type set_positions(uint64_t w, const value_type v)
     {
-		uintX_t res = ((masks[v]/*[0]*/ - (even_mask & w)) & carry_select_mask);
+		// std::cout << "w      : " << std::bitset<64>(w) << std::endl;
+		// std::cout << "mask   : " << std::bitset<64>(masks[v]) << std::endl;
+		// std::cout << "w_even : " << std::bitset<64>(even_mask & w) << std::endl;
+		// std::cout << "diff   : " << std::bitset<64>(masks[v]/*[0]*/ - (even_mask & w)) << std::endl;
+		// std::cout << "c_mask : " << std::bitset<64>(carry_select_mask) << std::endl;
+		// std::cout << "res1   : " << std::bitset<64>((masks[v]/*[0]*/ - (even_mask & w)) & carry_select_mask) << std::endl;
+
+		uint64_t res = ((masks[v]/*[0]*/ - (even_mask & w)) & carry_select_mask);
 		res |= ((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
+
+		// std::cout << "w>>t_b : " << std::bitset<64>(w >> t_b) << std::endl;
+		// std::cout << "mask   : " << std::bitset<64>(masks[v]) << std::endl;
+		// std::cout << "w_even : " << std::bitset<64>(even_mask & (w >> t_b)) << std::endl;
+		// std::cout << "diff   : " << std::bitset<64>(masks[v]/*[0]*/ - (even_mask & (w >> t_b))) << std::endl;
+		// std::cout << "c_mask : " << std::bitset<64>(carry_select_mask) << std::endl;
+		// std::cout << "res2   : " << std::bitset<64>((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << std::endl;
+		// std::cout << "res2<<1: " << std::bitset<64>(((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << 1) << std::endl;
+		// std::cout << "res    : " << std::bitset<64>(res) << std::endl;
+
 		return res;
     }
 
-	static std::enable_if_t<64 % t_b != 0, uint32_t> word_rank(const uint64_t* data, const size_type idx, const value_type v)
-	{
-		// size_type bit_pos = idx * t_b;
-		// size_type word = bit_pos >> 6;
-		// size_type in_word = bit_pos & 0x3F;
-		// uint128_t w(*(data + word), (word == 0) ? 0ull : *(data + word - 1));
-		// uint8_t offset = (word == 0) ? 64 : offsets[(word - 1) % cyclic_shifts];
-		// w =>> offset;
-		// return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
-		return 0;
-	}
+    static uint128_t set_positions(uint128_t w, const value_type v, const size_type word_pos, const bool debug = false)
+    {
+		uint8_t offset = 64 - (t_b - offsets[word_pos % cyclic_shifts]);
+		w >>= offset;
+		if (debug)
+		{
+			std::cout << "w (offset " << (unsigned) offset << "): "; print(w);
+		}
+
+		uint8_t offset_for_even_and_carry = t_b - offsets[1] + ((64 / t_b) & 0x01) * t_b;
+
+		uint128_t masks128;
+		set(masks128, /*masks[v][1]*/masks[v] >> offset_for_even_and_carry, masks[v]/*[0]*/);
+		if (debug)
+		{
+			std::cout << "masks        : "; print(masks128);
+		}
+
+		uint128_t even_mask128;
+		set(even_mask128, even_mask >> offset_for_even_and_carry, even_mask);
+		if (debug)
+		{
+			std::cout << "even_mask    : "; print(even_mask128);
+		}
+
+		uint128_t carry_select_mask128;
+		set(carry_select_mask128, carry_select_mask >> offset_for_even_and_carry, carry_select_mask);
+		if (debug)
+		{
+			std::cout << "carry_select : "; print(carry_select_mask128);
+		}
+
+		uint128_t res1 = ((masks128 - (even_mask128 & w)) & carry_select_mask128);
+		if (debug)
+		{
+			std::cout << "res1         : "; print(res1);
+		}
+
+		uint128_t res2 = ((masks128 - (even_mask128 & (w >> t_b))) & carry_select_mask128);
+		if (debug)
+		{
+			std::cout << "res2         : "; print(res2);
+		}
+
+		uint128_t res = res1 | (res2 << 1);
+		if (debug)
+		{
+			std::cout << "res          : "; print(res);
+		}
+
+		return res;
+    }
 
 	static int print(uint128_t x)
 	{
@@ -189,70 +246,141 @@ public:
 		w |= lo;
 	}
 
-	// NOTE(cpockrandt): we only count full blocks!
-	static std::enable_if_t<64 % t_b != 0, uint32_t> full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
+	static std::enable_if_t<64 % t_b != 0, uint32_t> word_rank(const uint64_t* data, const size_type idx, const value_type v)
 	{
+		bool debug = false;
+		if (debug)
+			std::cout << ".................................................................\nword_rank\n";
+
+		size_type bit_pos = idx * t_b;
+		size_type word_pos = bit_pos >> 6;
 		if (word_pos % cyclic_shifts == 0)
 		{
-			// word_pos can also be 0
 			uint64_t w = *(data + word_pos);
-			std::cout << "Simple case: " << bits::cnt(set_positions(w, v)) << ".\n";
-			return bits::cnt(set_positions(w, v));
+			return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
 		}
 		else
 		{
-			for (unsigned xxx = 0; xxx < 3; ++xxx)
-				std::cout << std::bitset<64>(*(data + xxx)) << std::endl;
-			std::cout << "Complex case.\n";
+			// for (unsigned xxx = 0; xxx < 3; ++xxx)
+			// 	std::cout << std::bitset<64>(*(data + xxx)) << std::endl;
+			if (debug)
+				std::cout << "Complex case.\n";
 			//std::cout << "div          : " << std::bitset<64>(~0ULL) << std::bitset<64>(0ULL) << std::endl;
 			//std::cout << "w manual     : " << std::bitset<64>(*(data + word_pos)) << std::bitset<64>(*(data + word_pos - 1)) << std::endl;
 
+			size_type in_word_pos = bit_pos & 0x3F;
+
 			uint128_t w;
 			set(w, *(data + word_pos), *(data + word_pos - 1));
-			std::cout << "w            : "; print(w);
+			if (debug)
+			{
+				std::cout << "w            : "; print(w);
+			}
 
-			uint8_t offset = 64 - (t_b - offsets[word_pos % cyclic_shifts]);
-			w >>= offset;
-			std::cout << "w (offset " << (unsigned) offset << "): "; print(w);
+			// uint8_t offset_shift = 64 - (t_b - offsets[(word_pos) % cyclic_shifts]);
+			// if (debug)
+			// 	std::cout << "offset_shift : " << (unsigned) offset_shift << std::endl;
+			// w >>= offset_shift;
+			//
+			// if (debug)
+			// 	std::cout << "w nach shift : "; print(w);
+
+			if (debug)
+			{
+				std::cout << "in_word_pos  : " << in_word_pos << std::endl;
+			}
 
 			// uint8_t w_width = 64 + (t_b - offsets[word_pos % cyclic_shifts]) - (t_b - offsets[(word_pos + 1) % cyclic_shifts]);
-			uint8_t w_width = 64 - offsets[word_pos % cyclic_shifts] + offsets[(word_pos + 1) % cyclic_shifts] + 1;
-			std::cout << "w_width      : " << (unsigned) w_width << std::endl; // added plus one because:
+			uint8_t w_width = in_word_pos + (t_b - offsets[(word_pos) % cyclic_shifts]) + 1;
+			if (debug)
+			{
+				std::cout << "w_width      : " << (unsigned) w_width << std::endl; // added plus one because:
+			}
 			// even:   0111000111000111000111000111000111000111000111000111000111000111
 			// lo_set: 0111111111111111111111111111111111111111111111111111111111111111
 			// but carry bit will be on the very first position!
 
 			uint128_t lo_set128;
 			set(lo_set128, bits::lo_set[std::max((signed) 0, w_width - 64)], bits::lo_set[std::min((uint8_t)64, w_width)]);
-			std::cout << "lo_set       : "; print(lo_set128);
+			if (debug)
+			{
+				std::cout << "lo_set       : "; print(lo_set128);
+			}
 
-			uint8_t offset_for_even_and_carry = t_b - offsets[1] + ((64 / t_b) & 0x01) * t_b;
+			uint128_t res = set_positions(w, v, word_pos, debug) & lo_set128;
+			if (debug)
+			{
+				std::cout << "lo_set & res : "; print(res);
+			}
 
-			uint128_t masks128;
-			set(masks128, /*masks[v][1]*/masks[v] >> offset_for_even_and_carry, masks[v]/*[0]*/);
-			std::cout << "masks        : "; print(masks128);
+			if (debug)
+			{
+				std::cout << "popcount(res): " << (bits::cnt(res >> 64) + bits::cnt(res)) << std::endl;
+			}
 
-			uint128_t even_mask128;
-			set(even_mask128, even_mask >> offset_for_even_and_carry, even_mask);
-			std::cout << "even_mask    : "; print(even_mask128);
+			return bits::cnt(res >> 64) + bits::cnt(res);
+		}
+	}
 
-			uint128_t carry_select_mask128;
-			set(carry_select_mask128, carry_select_mask >> offset_for_even_and_carry, carry_select_mask);
-			std::cout << "carry_select : "; print(carry_select_mask128);
+	// NOTE(cpockrandt): we only count full blocks!
+	static std::enable_if_t<64 % t_b != 0, uint32_t> full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
+	{
+		bool debug = false;
+		if (debug)
+			std::cout << ".................................................................\nfull_word_rank\n";
 
-			uint128_t res1 = ((masks128 - (even_mask128 & w)) & carry_select_mask128);
-			std::cout << "res1         : "; print(res1);
+		if (word_pos % cyclic_shifts == 0)
+		{
+			// word_pos can also be 0
+			uint64_t w = *(data + word_pos);
+			if (debug)
+				std::cout << "Simple case: " << bits::cnt(set_positions(w, v)) << ".\n";
+			return bits::cnt(set_positions(w, v));
+		}
+		else
+		{
+			// for (unsigned xxx = 0; xxx < 3; ++xxx)
+			// 	std::cout << std::bitset<64>(*(data + xxx)) << std::endl;
+			if (debug)
+				std::cout << "Complex case.\n";
+			//std::cout << "div          : " << std::bitset<64>(~0ULL) << std::bitset<64>(0ULL) << std::endl;
+			//std::cout << "w manual     : " << std::bitset<64>(*(data + word_pos)) << std::bitset<64>(*(data + word_pos - 1)) << std::endl;
 
-			uint128_t res2 = ((masks128 - (even_mask128 & (w >> t_b))) & carry_select_mask128);
-			std::cout << "res2         : "; print(res2);
+			uint128_t w;
+			set(w, *(data + word_pos), *(data + word_pos - 1));
+			if (debug)
+			{
+				std::cout << "w            : "; print(w);
+			}
 
-			uint128_t res = res1 | (res2 << 1);
-			std::cout << "res          : "; print(res);
+			// uint8_t w_width = 64 + (t_b - offsets[word_pos % cyclic_shifts]) - (t_b - offsets[(word_pos + 1) % cyclic_shifts]);
+			// wrong for last cyclic shift: uint8_t w_width = 64 - offsets[word_pos % cyclic_shifts] + offsets[(word_pos + 1) % cyclic_shifts] + 1;
+			uint8_t w_width = 64 + (t_b - offsets[word_pos % cyclic_shifts]) + 1;
+			if ((word_pos + 1) % cyclic_shifts) // offsets[(word_pos + 1) % cyclic_shifts] > 0
+			 	w_width -= (t_b - offsets[(word_pos + 1) % cyclic_shifts]);
+			if (debug)
+				std::cout << "w_width      : " << (unsigned) w_width << std::endl; // added plus one because:
+			// even:   0111000111000111000111000111000111000111000111000111000111000111
+			// lo_set: 0111111111111111111111111111111111111111111111111111111111111111
+			// but carry bit will be on the very first position!
 
-			res &= lo_set128;
-			std::cout << "res & loset  : "; print(res);
+			uint128_t lo_set128;
+			set(lo_set128, bits::lo_set[std::max((signed) 0, w_width - 64)], bits::lo_set[std::min((uint8_t)64, w_width)]);
+			if (debug)
+			{
+				std::cout << "lo_set       : "; print(lo_set128);
+			}
 
-			std::cout << "popcount(...): " << (unsigned) (bits::cnt(res >> 64) + bits::cnt(res)) << std::endl;
+			uint128_t res = set_positions(w, v, word_pos, debug) & lo_set128;
+			if (debug)
+			{
+				std::cout << "lo_set & res : "; print(res);
+			}
+
+			if (debug)
+			{
+				std::cout << "popcount(res): " << (bits::cnt(res >> 64) + bits::cnt(res)) << std::endl;
+			}
 
 			return bits::cnt(res >> 64) + bits::cnt(res);
 		}

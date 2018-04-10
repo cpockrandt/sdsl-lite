@@ -26,10 +26,11 @@ namespace sdsl {
 template <uint8_t t_b, uint8_t t_v>
 class rank_support_int_scan : public rank_support_int<t_b, t_v> {
 protected:
-	const int_vector<t_b>* m_v; //!< Pointer to the rank supported bit_vector
+	using rank_support_int<t_b, t_v>::m_v;
 public:
 	typedef int_vector<t_b> int_vector_type;
     typedef typename rank_support_int<t_b, t_v>::size_type size_type;
+    typedef typename rank_support_int<t_b, t_v>::value_type value_type;
 	// enum { bit_pat = t_b };
 	// enum { bit_pat_len = t_pat_len };
 
@@ -39,8 +40,8 @@ public:
 	rank_support_int_scan(rank_support_int_scan&& rs)	  = default;
 	rank_support_int_scan& operator=(const rank_support_int_scan& rs) = default;
 	rank_support_int_scan& operator=(rank_support_int_scan&& rs) = default;
-	size_type rank(size_type idx) const;
-	size_type operator()(size_type idx) const { return rank(idx); };
+	size_type rank(size_type idx, const value_type v) const;
+	size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); };
 	size_type					   size() const { return m_v->size(); };
 	size_type
 	serialize(std::ostream& out, structure_tree_node* v = nullptr, std::string name = "") const
@@ -53,18 +54,19 @@ public:
 
 template <uint8_t t_b, uint8_t t_v>
 inline typename rank_support_int_scan<t_b, t_v>::size_type
-rank_support_int_scan<t_b, t_v>::rank(size_type idx) const
+rank_support_int_scan<t_b, t_v>::rank(size_type idx, const value_type v) const
 {
 	assert(m_v != nullptr);
 	assert(idx <= m_v->size());
-	const uint64_t* p	  = m_v->data();
-	size_type		i	  = 0;
-	size_type		result = 0;
-	while (i + 64 <= idx) {
-		result += rank_support_int_trait<t_b, t_v>::full_word_rank(p, i);
-		i += 64;
+	const uint64_t* p	    = m_v->data();
+	size_type		word_pos = (idx * t_b) >> 6;
+	size_type       i       = 0;
+	size_type		result  = 0;
+	while (i < word_pos) {
+		result += rank_support_int_trait<t_b, t_v>::full_word_rank(p, i, v);
+		++i;
 	}
-	return result + rank_support_int_trait<t_b, t_v>::word_rank(p, idx);
+	return result + rank_support_int_trait<t_b, t_v>::word_rank(p, idx, v);
 }
 
 } // end namespace sds

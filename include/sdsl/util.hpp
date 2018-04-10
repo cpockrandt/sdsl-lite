@@ -106,6 +106,9 @@ void expand_width(t_int_vec& v, uint8_t new_width);
 template <class t_int_vec>
 void mod(t_int_vec& v, typename t_int_vec::size_type m);
 
+void cyclic_shifts(uint64_t* vec, uint8_t & n, uint64_t k, uint8_t int_width, uint8_t* offsets);
+
+constexpr unsigned gcd(unsigned u, unsigned v);
 
 //! Set all entries of int_vector to value k
 /*! \param  v The int_vector which should be set
@@ -528,6 +531,30 @@ void util::_set_one_bits(t_int_vec& v)
 	for (typename t_int_vec::size_type i = 1; i < (v.capacity() >> 6); ++i) {
 		*(++data) = 0xFFFFFFFFFFFFFFFFULL;
 	}
+}
+
+constexpr unsigned util::gcd(unsigned u, unsigned v)
+{
+	return (v != 0) ? util::gcd(v, u % v) : u;
+}
+
+void util::cyclic_shifts(uint64_t* vec, uint8_t & n, uint64_t k, uint8_t int_width, uint8_t* offsets)
+{
+	n = 0;
+	vec[0] = 0;
+	uint8_t offset = 0;
+	offsets[0] = 0;
+	k &= 0xFFFFFFFFFFFFFFFFULL >> (64 - int_width);
+	do { // loop terminates after at most 64 iterations
+		vec[n] |= k << offset;
+		offset += int_width;
+		if (offset >= 64) {
+			vec[n + 1] = 0;
+			vec[++n] = k >> (int_width - (offset - 64));
+			offset -= 64;
+			offsets[n] = offset;
+		}
+	} while (offset != 0);
 }
 
 template <class t_int_vec>

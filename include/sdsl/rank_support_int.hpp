@@ -96,16 +96,15 @@ inline rank_support_int<t_b, t_v>::rank_support_int(const int_vector<t_b>* v) { 
 //     return create_bitmask_recursive(0);
 // }
 
-// https://stackoverflow.com/questions/30953248/why-doesnt-sfinae-enable-if-work-for-member-functions-of-a-class-template
+template <uint8_t t_b, uint8_t t_v, typename T = void>
+struct rank_support_int_trait;
 
 template <uint8_t t_b, uint8_t t_v>
-struct rank_support_int_trait {
+struct rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> > {
 protected:
-	static constexpr uint8_t cyclic_shifts = t_b / util::gcd(t_b, 64 % t_b);
-	static uint8_t offsets[cyclic_shifts + 1]; // TODO(cpockrandt) + 1
-	static uint64_t masks[t_v]/*[cyclic_shifts + 1]*/; // TODO(cpockrandt) + 1
-	static uint64_t even_mask; // TODO: 128bit even_mask
-	static uint64_t carry_select_mask; // TODO: 128bit
+	static uint64_t masks[t_v];
+	static uint64_t even_mask;
+	static uint64_t carry_select_mask;
 
 public:
 	typedef typename rank_support_int<t_b, t_v>::size_type size_type;
@@ -115,6 +114,60 @@ public:
 	{
 		even_mask = bits::lo_set[t_b];
 		for (uint8_t i = t_b * 2; i < 64; i <<= 1)
+			even_mask |= even_mask << i;
+
+		for (value_type v = 0; v < t_v; ++v)
+		{
+			masks[v] = v;
+			for (uint8_t i = t_b * 2; i < 64; i <<= 1)
+				masks[v] |= masks[v] << i;
+		}
+
+		carry_select_mask = masks[1] << t_b;
+
+		uint64_t tmp_carry = masks[1];
+		for (value_type v = 0; v < t_v; ++v)
+			masks[v] |= tmp_carry << t_b;
+	}
+
+    static size_type set_positions(uint64_t w, const value_type v)
+    {
+		uint64_t res = (masks[v] - (even_mask & w)) & carry_select_mask;
+		res |= ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
+		return res;
+    }
+
+	static uint32_t word_rank(const uint64_t* data, const size_type idx, const value_type v)
+	{
+		size_type bit_pos = idx * t_b;
+		uint64_t w = *(data + (bit_pos >> 6));
+		return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
+	}
+
+	static uint32_t full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
+	{
+		uint64_t w = *(data + word_pos);
+		return bits::cnt(set_positions(w, v));
+	}
+};
+
+template <uint8_t t_b, uint8_t t_v>
+struct rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> > {
+protected:
+	static constexpr uint8_t cyclic_shifts = t_b / util::gcd(t_b, 64 % t_b);
+	static uint8_t offsets[cyclic_shifts + 1]; // TODO(cpockrandt) + 1
+	static uint128_t masks[t_v];
+	static uint128_t even_mask;
+	static uint128_t carry_select_mask;
+
+public:
+	typedef typename rank_support_int<t_b, t_v>::size_type size_type;
+	typedef typename rank_support_int<t_b, t_v>::value_type value_type;
+
+	static void init()
+	{
+		even_mask = bits::lo_set[t_b];
+		for (uint8_t i = t_b * 2; i < 128; i <<= 1)
 		{
 			even_mask |= even_mask << i;
 		}
@@ -122,15 +175,13 @@ public:
 		for (value_type v = 0; v < t_v; ++v)
 		{
 			masks[v] = v;
-			for (uint8_t i = t_b * 2; i < 64; i <<= 1)
-			{
+			for (uint8_t i = t_b * 2; i < 128; i <<= 1)
 				masks[v] |= masks[v] << i;
-			}
 			// uint8_t tmp_n = 0;
 			// util::cyclic_shifts(masks[v], tmp_n, v, t_b, offsets);
 			// for (unsigned i = 0; i < cyclic_shifts; ++i)
 			// {
-				masks[v]/*[i]*/ &= even_mask;
+				// masks[v] &= even_mask; // TODO: necessary?
 			// }
 		}
 
@@ -143,41 +194,18 @@ public:
 		// 	std::cout << (unsigned) offsets[i] << ", ";
 		// std::cout << std::endl;
 
-		carry_select_mask = masks[1]/*[0]*/ << t_b;
+		carry_select_mask = masks[1] << t_b;
 
-		uint64_t tmp_carry = masks[1]/*[0]*/; // TODO: offi
+		uint64_t tmp_carry = masks[1];
 		for (value_type v = 0; v < t_v; ++v)
-		{
-			for (unsigned i = 0; i < cyclic_shifts; ++i)
-			{
-				masks[v]/*[i]*/ |= tmp_carry << t_b;
-				// std::cout << std::bitset<64>(masks[v][i]) << std::endl;
-			}
-			// std::cout << "..............................................................................\n";
-		}
+			masks[v] |= tmp_carry << t_b;
 	}
 
     static size_type set_positions(uint64_t w, const value_type v)
     {
-		// std::cout << "w      : " << std::bitset<64>(w) << std::endl;
-		// std::cout << "mask   : " << std::bitset<64>(masks[v]) << std::endl;
-		// std::cout << "w_even : " << std::bitset<64>(even_mask & w) << std::endl;
-		// std::cout << "diff   : " << std::bitset<64>(masks[v]/*[0]*/ - (even_mask & w)) << std::endl;
-		// std::cout << "c_mask : " << std::bitset<64>(carry_select_mask) << std::endl;
-		// std::cout << "res1   : " << std::bitset<64>((masks[v]/*[0]*/ - (even_mask & w)) & carry_select_mask) << std::endl;
-
-		uint64_t res = ((masks[v]/*[0]*/ - (even_mask & w)) & carry_select_mask);
-		res |= ((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
-
-		// std::cout << "w>>t_b : " << std::bitset<64>(w >> t_b) << std::endl;
-		// std::cout << "mask   : " << std::bitset<64>(masks[v]) << std::endl;
-		// std::cout << "w_even : " << std::bitset<64>(even_mask & (w >> t_b)) << std::endl;
-		// std::cout << "diff   : " << std::bitset<64>(masks[v]/*[0]*/ - (even_mask & (w >> t_b))) << std::endl;
-		// std::cout << "c_mask : " << std::bitset<64>(carry_select_mask) << std::endl;
-		// std::cout << "res2   : " << std::bitset<64>((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << std::endl;
-		// std::cout << "res2<<1: " << std::bitset<64>(((masks[v]/*[0]*/ - (even_mask & (w >> t_b))) & carry_select_mask) << 1) << std::endl;
-		// std::cout << "res    : " << std::bitset<64>(res) << std::endl;
-
+		// TODO: 128bit-masken auf 64bit casten?
+		uint64_t res = (masks[v] - (even_mask & w)) & carry_select_mask;
+		res |= ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
 		return res;
     }
 
@@ -192,34 +220,32 @@ public:
 
 		uint8_t offset_for_even_and_carry = t_b - offsets[1] + ((64 / t_b) & 0x01) * t_b;
 
-		uint128_t masks128;
-		set(masks128, /*masks[v][1]*/masks[v] >> offset_for_even_and_carry, masks[v]/*[0]*/);
+		// uint128_t masks128;
+		// set(masks128, /*masks[v][1]*/masks[v] >> offset_for_even_and_carry, masks[v]);
 		if (debug)
 		{
-			std::cout << "masks        : "; print(masks128);
+			std::cout << "masks        : "; print(masks[v]);
 		}
 
-		uint128_t even_mask128;
-		set(even_mask128, even_mask >> offset_for_even_and_carry, even_mask);
 		if (debug)
 		{
-			std::cout << "even_mask    : "; print(even_mask128);
+			std::cout << "even_mask    : "; print(even_mask);
 		}
 
-		uint128_t carry_select_mask128;
-		set(carry_select_mask128, carry_select_mask >> offset_for_even_and_carry, carry_select_mask);
+		// uint128_t carry_select_mask128;
+		// set(carry_select_mask128, carry_select_mask >> offset_for_even_and_carry, carry_select_mask);
 		if (debug)
 		{
-			std::cout << "carry_select : "; print(carry_select_mask128);
+			std::cout << "carry_select : "; print(carry_select_mask);
 		}
 
-		uint128_t res1 = ((masks128 - (even_mask128 & w)) & carry_select_mask128);
+		uint128_t res1 = ((masks[v] - (even_mask & w)) & carry_select_mask);
 		if (debug)
 		{
 			std::cout << "res1         : "; print(res1);
 		}
 
-		uint128_t res2 = ((masks128 - (even_mask128 & (w >> t_b))) & carry_select_mask128);
+		uint128_t res2 = ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask);
 		if (debug)
 		{
 			std::cout << "res2         : "; print(res2);
@@ -246,7 +272,7 @@ public:
 		w |= lo;
 	}
 
-	static std::enable_if_t<64 % t_b != 0, uint32_t> word_rank(const uint64_t* data, const size_type idx, const value_type v)
+	static uint32_t word_rank(const uint64_t* data, const size_type idx, const value_type v)
 	{
 		bool debug = false;
 		if (debug)
@@ -323,7 +349,7 @@ public:
 	}
 
 	// NOTE(cpockrandt): we only count full blocks!
-	static std::enable_if_t<64 % t_b != 0, uint32_t> full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
+	static uint32_t full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
 	{
 		bool debug = false;
 		if (debug)
@@ -385,32 +411,25 @@ public:
 			return bits::cnt(res >> 64) + bits::cnt(res);
 		}
 	}
-
-	// static std::enable_if_t<64 % t_b == 0, uint32_t> word_rank(const uint64_t* data, const size_type idx, const value_type v)
-	// {
-	// 	size_type bit_pos = idx * t_b;
-	// 	uint64_t w = *(data + (bit_pos >> 6));
-	// 	return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
-	// }
-	//
-	// static std::enable_if_t<64 % t_b == 0, uint32_t> full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
-	// {
-	// 	uint64_t w = *(data + word_pos);
-	// 	return bits::cnt(set_positions(w, v));
-	// }
 };
 
 template <uint8_t t_b, uint8_t t_v>
-uint64_t rank_support_int_trait<t_b, t_v>::masks[t_v]/*[rank_support_int_trait<t_b, t_v>::cyclic_shifts + 1]*/; // TODO(cpockrandt) + 1
+uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::masks[t_v];
+template <uint8_t t_b, uint8_t t_v>
+uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::masks[t_v];
 
 template <uint8_t t_b, uint8_t t_v>
-uint8_t rank_support_int_trait<t_b, t_v>::offsets[rank_support_int_trait<t_b, t_v>::cyclic_shifts + 1]; // TODO(cpockrandt) + 1
+uint8_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::offsets[rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::cyclic_shifts + 1]; // TODO(cpockrandt) + 1
 
 template <uint8_t t_b, uint8_t t_v>
-uint64_t rank_support_int_trait<t_b, t_v>::even_mask;
+uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::even_mask;
+template <uint8_t t_b, uint8_t t_v>
+uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::even_mask;
 
 template <uint8_t t_b, uint8_t t_v>
-uint64_t rank_support_int_trait<t_b, t_v>::carry_select_mask;
+uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::carry_select_mask;
+template <uint8_t t_b, uint8_t t_v>
+uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::carry_select_mask;
 
 } // end namespace sdsl
 

@@ -3,13 +3,15 @@
 // by a BSD license that can be found in the LICENSE file.
 /*! \file rank_support_int.hpp
     \brief rank_support_int.hpp contains classes that support a sdsl::int_vector with constant time rank information.
+           Rank is defined as the number of occurrences lexicographically smaller or equal than a given element up to a
+           given position.
 	\author Christopher Pockrandt
 */
 #ifndef INCLUDED_SDSL_RANK_SUPPORT_INT
 #define INCLUDED_SDSL_RANK_SUPPORT_INT
 
 /** \defgroup rank_support_group Rank Support (RS)
- * This group contains data structures which support an sdsl::bit_vector with the rank method.
+ * This group contains data structures which support an sdsl::int_vector with the rank method.
  */
 
  #include "int_vector.hpp"
@@ -20,14 +22,14 @@
 //! Namespace for the succinct data structure library.
 namespace sdsl {
 
-//! The base class of classes supporting rank_queries for a sdsl::bit_vector in constant time.
+//! The base class of classes supporting rank_queries for a sdsl::int_vector in constant time.
 /*!
 */
-template <uint8_t t_b, uint8_t t_v>
+template <uint8_t t_b>
 class rank_support_int {
 protected:
 	const int_vector<t_b>* m_v; //!< Pointer to the rank supported bit_vector
-
+    static_assert(t_b > 1, "rank_support_int and deriving classes are not supported on sdsl::bit_vector. Please use an sdsl::int_vector<t_width> with 1 < t_width < 8.");
 public:
 	typedef typename int_vector<t_b>::size_type size_type;
 	typedef typename int_vector<t_b>::value_type value_type;
@@ -63,16 +65,16 @@ public:
             \param v The supported bit_vector.
          */
 	virtual void load(std::istream& in, const int_vector<t_b>* v = nullptr) = 0;
-	//! Sets the supported bit_vector to the given pointer.
-	/*! \param v The new bit_vector to support.
-         *  \note Method init has to be called before the next call of rank.
-         *  \sa init, rank
-         */
-	virtual void set_vector(const int_vector<t_b>* v = nullptr) = 0;
+	// //! Sets the supported bit_vector to the given pointer.
+	// /*! \param v The new bit_vector to support.
+    //      *  \note Method init has to be called before the next call of rank.
+    //      *  \sa init, rank
+    //      */
+	// virtual void set_vector(const int_vector<t_b>* v = nullptr) = 0;
 };
 
-template <uint8_t t_b, uint8_t t_v>
-inline rank_support_int<t_b, t_v>::rank_support_int(const int_vector<t_b>* v) { m_v = v; }
+template <uint8_t t_b>
+inline rank_support_int<t_b>::rank_support_int(const int_vector<t_b>* v) { m_v = v; }
 
 //----------------------------------------------------------------------
 
@@ -82,20 +84,22 @@ constexpr uintX_t bm_rec(const uintX_t w, const uint8_t length, const uint8_t ma
     return (length >= max_length) ? w : bm_rec(w | (w << length), length << 1, max_length);
 }
 
-template <uint8_t t_b, uint8_t t_v, typename T = void>
+template <uint8_t t_b, typename T = void>
 struct rank_support_int_trait;
 
-template <uint8_t t_b, uint8_t t_v>
-struct rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> > {
+template <uint8_t t_b>
+struct rank_support_int_trait<t_b, std::enable_if_t<64 % t_b == 0> > {
 protected:
+    constexpr static uint8_t t_v = 1ULL << t_b;
 	static uint64_t masks[t_v];
 	constexpr static uint64_t even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
 	constexpr static uint64_t carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);
 
 public:
-	typedef typename rank_support_int<t_b, t_v>::size_type size_type;
-	typedef typename rank_support_int<t_b, t_v>::value_type value_type;
+	typedef typename rank_support_int<t_b>::size_type size_type;
+	typedef typename rank_support_int<t_b>::value_type value_type;
 
+    // https://stackoverflow.com/questions/2226291/is-it-possible-to-create-and-initialize-an-array-of-values-using-template-metapr
 	// TODO(cpockrandt): make bitmasks all constexpr and remove this method
 	static void init()
 	{
@@ -132,9 +136,10 @@ public:
 	}
 };
 
-template <uint8_t t_b, uint8_t t_v>
-struct rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> > {
+template <uint8_t t_b>
+struct rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> > {
 protected:
+    constexpr static uint8_t t_v = 1ULL << t_b;
 	static constexpr uint8_t cyclic_shifts = t_b / util::gcd(t_b, 64 % t_b);
 	static uint8_t offsets[cyclic_shifts];
 	static uint128_t masks[t_v];
@@ -142,8 +147,8 @@ protected:
 	constexpr static uint128_t carry_select_mask = bm_rec<uint128_t>(1ULL << t_b, t_b * 2, 128);
 
 public:
-	typedef typename rank_support_int<t_b, t_v>::size_type size_type;
-	typedef typename rank_support_int<t_b, t_v>::value_type value_type;
+	typedef typename rank_support_int<t_b>::size_type size_type;
+	typedef typename rank_support_int<t_b>::value_type value_type;
 
 	static void init()
 	{
@@ -236,27 +241,27 @@ public:
 	}
 };
 
-template <uint8_t t_b, uint8_t t_v>
-uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::masks[t_v];
-template <uint8_t t_b, uint8_t t_v>
-uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::masks[t_v];
+template <uint8_t t_b>
+uint64_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b == 0> >::masks[t_v];
+template <uint8_t t_b>
+uint128_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> >::masks[t_v];
 
-template <uint8_t t_b, uint8_t t_v>
-uint8_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::offsets[rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::cyclic_shifts];
+template <uint8_t t_b>
+uint8_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> >::offsets[rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> >::cyclic_shifts];
 
-template <uint8_t t_b, uint8_t t_v>
-constexpr uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::even_mask;
-template <uint8_t t_b, uint8_t t_v>
-constexpr uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::even_mask;
+template <uint8_t t_b>
+constexpr uint64_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b == 0> >::even_mask;
+template <uint8_t t_b>
+constexpr uint128_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> >::even_mask;
 
-template <uint8_t t_b, uint8_t t_v>
-constexpr uint64_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b == 0> >::carry_select_mask;
-template <uint8_t t_b, uint8_t t_v>
-constexpr uint128_t rank_support_int_trait<t_b, t_v, std::enable_if_t<64 % t_b != 0> >::carry_select_mask;
+template <uint8_t t_b>
+constexpr uint64_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b == 0> >::carry_select_mask;
+template <uint8_t t_b>
+constexpr uint128_t rank_support_int_trait<t_b, std::enable_if_t<64 % t_b != 0> >::carry_select_mask;
 
 } // end namespace sdsl
 
-// #include "rank_support_int_v.hpp"
+#include "rank_support_int_v.hpp"
 #include "rank_support_int_scan.hpp"
 
 #endif // end file

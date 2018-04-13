@@ -39,6 +39,7 @@ template <uint8_t t_b>
 class rank_support_int_v : public rank_support_int<t_b> {
 public:
 	typedef int_vector<t_b> int_vector_type;
+	typedef rank_support_int_trait<t_b> trait_type;
 	typedef typename rank_support_int<t_b>::size_type size_type;
 	typedef typename rank_support_int<t_b>::value_type value_type;
 	// enum { bit_pat = t_b };
@@ -48,7 +49,7 @@ private:
 	using rank_support_int<t_b>::m_v;
 	// basic block for interleaved storage of superblockrank and blockrank
 	int_vector<64> m_basic_block;
-	// constexpr static uint8_t t_v = 1ULL << t_b;
+	constexpr static uint8_t t_v = 1ULL << t_b;
 
 public:
 
@@ -76,29 +77,102 @@ public:
 		m_basic_block.resize(basic_block_size); // resize structure for basic_blocks
 		// if (m_basic_block.empty()) return; // this can never happen???? because we do +1 after >> 9
 		const uint64_t* data = m_v->data();
-		size_type		i, j = 0;
-		m_basic_block[0] = m_basic_block[1] = 0;
-		
-		// uint64_t carry			  = trait_type::init_carry();
-		// uint64_t sum			  = trait_type::args_in_the_word(*data, carry);
-		// uint64_t second_level_cnt = 0;
-		// for (i = 1; i < (m_v->capacity() >> 6); ++i) {
-		// 	if (!(i & 0x7)) { // if i%8==0
-		// 		j += 2;
-		// 		m_basic_block[j - 1] = second_level_cnt;
-		// 		m_basic_block[j]	 = m_basic_block[j - 2] + sum;
-		// 		second_level_cnt = sum = 0;
-		// 	} else {
-		// 		second_level_cnt |= sum << (63 - 9 * (i & 0x7)); //  54, 45, 36, 27, 18, 9, 0
+
+		size_type i = 1, j = 0;
+		uint16_t b_cnt[t_v - 1] = {0};
+		uint64_t b_cnt_word[t_v - 1] = {0};
+
+		for (value_type v = 0; v < t_v - 1; ++v) {
+			m_basic_block[2*v] = m_basic_block[2*v + 1] = 0;
+			b_cnt[v] = trait_type::full_word_rank(data, 0, v);
+			if (v == 0)
+				std::cout << "full word_rank cum: " << (unsigned) b_cnt[v] << "\n";
+			// std::cout << b_cnt[v] << "\n";
+		}
+std::cout << "capa # words: " << (m_v->capacity() >> 6) << "\n";
+		for (; i < (m_v->capacity() >> 6); ++i) {
+			for (value_type v = 0; v < 1/*t_v - 1*/; ++v) { // TODO: maybe switch loop over v and if statement over i % 8 (order)
+
+				if (!(i & 0x7)) { // if i%8==0
+					if (!v) // v == 0
+						j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
+					m_basic_block[j - 2 * (t_v - 2 - v) - 1] = b_cnt_word[v];
+					m_basic_block[j] = m_basic_block[j - 2 * (t_v - 2 - v) - 2] + b_cnt[v];
+					b_cnt[v] = 0;
+					b_cnt_word[v] = 0;
+					std::cout << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
+				} else {
+					b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7)); //  48 40 32 24 16 8 0
+				}
+				if (v == 0)
+					std::cout << "small word A: " << std::bitset<64>(b_cnt_word[v]) << "\n";
+				b_cnt[v] += trait_type::full_word_rank(data, i, v); // TODO: nicht schon vor dem if machen?
+				if (v == 0)
+					std::cout << "full word_rank cum: " << (unsigned) b_cnt[v] << "\n";
+			}
+		}
+
+		if (!(i & 0x7)) // v == 0
+			j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
+
+
+		std::cout << "i: " << i << "\n";
+		std::cout << "j: " << j << "\n";
+
+		for (value_type v = 0; v < t_v - 1; ++v) {
+			if (!(i & 0x7)) { // if i%8 == 0
+				std::cout << "v=" << (unsigned) v << ": " << (j - 2 * (t_v - 2 - v) - 1) << ", " << j << ", " << (j - 2 * (t_v - 2 - v) - 2) << "\n";
+				m_basic_block[j - 2 * (t_v - 2 - v) - 1] = b_cnt_word[v];
+				m_basic_block[j] = m_basic_block[j - 2 * (t_v - 2 - v) - 2] + b_cnt[v];
+				// m_basic_block[j - 2 * (t_v - 2 - v) + 1] = 0;
+			} else { // if i%8 != 0
+				// b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7));
+				m_basic_block[j + 1] = b_cnt_word[v];
+				std::cout << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
+			}
+		}
+
+		for (unsigned x = 0; x < m_basic_block.size(); ++x)
+		{
+			if (x % 6 == 0)
+				std::cout << "---------------------------------------------------------------------\n";
+			if (x % 2 == 0)
+				std::cout << "sb ";
+			else
+				std::cout << "b  ";
+
+			if (x % 6 == 0 || x % 6 == 1)
+				std::cout << "A  ";
+			else if (x % 6 == 2 || x % 6 == 3)
+				std::cout << "C  ";
+			else
+				std::cout << "G  ";
+
+			std::cout << std::bitset<64>(m_basic_block[x]) << std::endl;
+		}
+
+		// size_type j = 0;
+		// uint64_t sum = 0;
+		// uint64_t block_cnt = 0;
+		// for (size_type i = 1; i < (m_v->capacity() >> 6); ++i) {
+		// 	for (value_type v = 0; v < t_v - 1; ++v) {
+		// 		if (!(i & 0x7)) { // if i%8==0
+		// 			j += 2;
+		// 			m_basic_block[j - 1] = block_cnt;
+		// 			m_basic_block[j]	 = m_basic_block[j - 2] + sum;
+		// 			block_cnt = sum = 0;
+		// 		} else {
+		// 			block_cnt |= sum << (63 - 9 * (i & 0x7)); //  54, 45, 36, 27, 18, 9, 0
+		// 		}
+		// 		sum += trait_type::full_word_rank(*(++data));
 		// 	}
-		// 	sum += trait_type::args_in_the_word(*(++data), carry);
 		// }
 		// if (i & 0x7) { // if i%8 != 0
-		// 	second_level_cnt |= sum << (63 - 9 * (i & 0x7));
-		// 	m_basic_block[j + 1] = second_level_cnt;
+		// 	block_cnt |= sum << (63 - 9 * (i & 0x7));
+		// 	m_basic_block[j + 1] = block_cnt;
 		// } else { // if i%8 == 0
 		// 	j += 2;
-		// 	m_basic_block[j - 1] = second_level_cnt;
+		// 	m_basic_block[j - 1] = block_cnt;
 		// 	m_basic_block[j]	 = m_basic_block[j - 2] + sum;
 		// 	m_basic_block[j + 1] = 0;
 		// }
@@ -117,14 +191,25 @@ public:
 		if (v == t_v - 1) // max value
 			return idx;
 
-		const uint64_t* p =
-		m_basic_block.data() + ((idx >> 8) & 0xFFFFFFFFFFFFFFFEULL); // (idx/512)*2
+		const uint64_t* p = m_basic_block.data() + (((idx * t_b) >> 8) + 2 * t_b); // 2*(idx*t_b/512) + 2*v
+
+		std::cout << "rank(" << idx << ", " << (unsigned) v << ") - sb: " << *p << ", b : " << ((*(p + 1) >> (((idx * t_b) & 0x1FF) >> 3)) & 0x7);
+		if (idx & (0x1F))
+			std::cout << ", pc: " << trait_type::word_rank(m_v->data(), idx, v);
+		std::cout << std::endl;
+
+		if (idx & (0x1F)) // nur für DNA-alphabet   							 // if (idx%32)!=0
+			return *p + ((*(p + 1) >> (((idx * t_b) & 0x1FF) >> 3)) & 0b11111111) +
+				   trait_type::word_rank(m_v->data(), idx, v);
+		else
+			return *p + ((*(p + 1) >> (((idx * t_b) & 0x1FF) >> 3)) & 0b11111111);
+
+		// const uint64_t* p = m_basic_block.data() + ((idx >> 8) & 0xFFFFFFFFFFFFFFFEULL); // (idx/512)*2
 		// if (idx & 0x3F)												 // if (idx%64)!=0
 		// 	return *p + ((*(p + 1) >> (63 - 9 * ((idx & 0x1FF) >> 6))) & 0x1FF) +
 		// 		   trait_type::word_rank(m_v->data(), idx);
 		// else
 		// 	return *p + ((*(p + 1) >> (63 - 9 * ((idx & 0x1FF) >> 6))) & 0x1FF);
-		return 0;
 	}
 
 	inline size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); }

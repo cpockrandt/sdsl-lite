@@ -10,6 +10,9 @@
 
 #include "rank_support.hpp"
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
 //! Namespace for the succinct data structure library.
 namespace sdsl {
 
@@ -95,36 +98,24 @@ public:
 			b_cnt[v] = trait_type::full_word_rank(data, 0, v);
 		}
 
-		for (; i < (m_v->capacity() >> 6); ++i) {
+		for (; i < (m_v->capacity() >> 6) + 1; ++i) {
 			for (value_type v = 0; v < t_v - 1; ++v) { // TODO: maybe switch loop over v and if statement over i % 8 (order)
 				if (!(i & 0x7)) { // if i%8==0
 					if (!v) // v == 0
 						j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
 					size_type block_pos = j - 2 * (t_v - 2 - v) - 1;
 					m_basic_block[block_pos] = b_cnt_word[v];
-					m_basic_block[j + 2 * v] = m_basic_block[block_pos - 1] + b_cnt[v];
-					b_cnt[v] = 0;
-					b_cnt_word[v] = 0;
+					m_basic_block[j + 2*v] = m_basic_block[block_pos - 1] + b_cnt[v];
+					b_cnt[v] = b_cnt_word[v] = 0;
 				} else {
-					b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7)); //  48 40 32 24 16 8 0
+					b_cnt_word[v] |= b_cnt[v] << ((i & 0x7) << 3); // 48 40 32 24 16 8 0
 				}
 				b_cnt[v] += trait_type::full_word_rank(data, i, v);
 			}
 		}
 
-		if (!(i & 0x7)) // v == 0
-			j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
-
 		for (value_type v = 0; v < t_v - 1; ++v) {
-			if (!(i & 0x7)) { // if i%8 == 0
-				size_type block_pos = j - 2 * (t_v - 2 - v) - 1;
-				m_basic_block[block_pos] = b_cnt_word[v];
-				m_basic_block[j + 2 * v] = m_basic_block[block_pos - 1] + b_cnt[v];
-				m_basic_block[j + 2 * v + 1] = 0;
-			} else { // if i%8 != 0
-				b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7));
-				m_basic_block[j + 2 * v + 1] = b_cnt_word[v];
-			}
+			m_basic_block[j + 2*v + 1] = b_cnt_word[v];
 		}
 
 		// for (unsigned x = 0; x < m_basic_block.size(); ++x)
@@ -158,7 +149,7 @@ public:
 		assert(m_v != nullptr);
 		assert(idx <= m_v->size());
 
-		if (v == t_v - 1) // max value
+		if (unlikely(v == t_v - 1)) // TODO: test effect of likely/unlikely
 			return idx;
 
 		uint64_t word_pos = (2 * (t_v - 1) * (((idx * t_b) >> 9))) + 2 * v;
@@ -175,11 +166,12 @@ public:
 		// 	std::cout << "word_pos: " << word_pos << "\n";
 		// }
 
-		if (idx & (0x1F)) // if (idx % 32 != 0) nur für DNA-alphabet
-			return *p + ((*(p + 1) >> (8 * (((idx * t_b) & 0x1FF) / 64))) & 0b11111111) +
+		// TODO: test effect of likely/unlikely
+		if (likely(idx & (0x1F))) // if (idx % 32 != 0) nur für DNA-alphabet
+			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF) +
 				   trait_type::word_rank(m_v->data(), idx, v);
 		else
-			return *p + ((*(p + 1) >> (8 * (((idx * t_b) & 0x1FF) / 64))) & 0b11111111);
+			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
 	}
 
 	inline size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); }

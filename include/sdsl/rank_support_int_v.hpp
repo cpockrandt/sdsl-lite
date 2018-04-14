@@ -75,8 +75,7 @@ public:
 			return;
 		}
 		// 8 * 64 bit = 512 bit abdeckung je superblock
-		// TODO: 8 (eigentlich 7) blöcke à 8 bits in 1 64 wort. superblock 64 bit. interleaved
-		// TODO: für alle buchstaben 0 <= v < max_val
+		// 8 (eigentlich 7) blöcke à 8 bits in 1 64 wort. superblock 64 bit. interleaved
 		// format:
 		//             64 bit       64 bit         64 bit       64 bit         64 bit       64 bit
 		// ..... |---------------------------|---------------------------|---------------------------| .....
@@ -84,12 +83,7 @@ public:
 		// ..... |---------------------------|---------------------------|---------------------------| .....
 
 		size_type basic_block_size = ((v->capacity() >> 9) + 1) * 2 * (t_v - 1);
-		// if (v->size() == 512) {
-		// 	std::cout << "capacity: " << v->capacity() << "\n";
-		// 	std::cout << "basic_block_size: " << basic_block_size << "\n";
-		// }
 		m_basic_block.resize(basic_block_size); // resize structure for basic_blocks
-		// if (m_basic_block.empty()) return; // this can never happen???? because we do +1 after >> 9
 		const uint64_t* data = m_v->data();
 
 		size_type i = 1, j = 0;
@@ -99,52 +93,37 @@ public:
 		for (value_type v = 0; v < t_v - 1; ++v) {
 			m_basic_block[2*v] = m_basic_block[2*v + 1] = 0;
 			b_cnt[v] = trait_type::full_word_rank(data, 0, v);
-			// if (v == 0)
-			// std::cout << "full word_rank cum (" << (unsigned) v << "): " << (unsigned) b_cnt[v] << "\n";
 		}
 
-		// if (v->size() == 512)
-		// 	std::cout << "for: i < " << ((t_b * m_v->size()) >> 6) << "\n";
-
-		for (; i < (m_v->capacity() >> 6); ++i) { // former: for (; i < (m_v->capacity() >> 6); ++i)
+		for (; i < (m_v->capacity() >> 6); ++i) {
 			for (value_type v = 0; v < t_v - 1; ++v) { // TODO: maybe switch loop over v and if statement over i % 8 (order)
 				if (!(i & 0x7)) { // if i%8==0
 					if (!v) // v == 0
 						j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
-					m_basic_block[j - 2 * (t_v - 2 - v) - 1] = b_cnt_word[v];
-					m_basic_block[j + 2 * v] = m_basic_block[j - 2 * (t_v - 2 - v) - 2] + b_cnt[v];
+					size_type block_pos = j - 2 * (t_v - 2 - v) - 1;
+					m_basic_block[block_pos] = b_cnt_word[v];
+					m_basic_block[j + 2 * v] = m_basic_block[block_pos - 1] + b_cnt[v];
 					b_cnt[v] = 0;
 					b_cnt_word[v] = 0;
 				} else {
 					b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7)); //  48 40 32 24 16 8 0
 				}
-				// if (v == 0)
-					// std::cout << "small word A: ";
-					// printWord(b_cnt_word[v]);
-					// std::cout << /*std::bitset<64>(b_cnt_word[v]) <<*/ "\n";
-				b_cnt[v] += trait_type::full_word_rank(data, i, v); // TODO: nicht schon vor dem if machen?
-				// if (v == 0)
-				// 	std::cout << "full word_rank cum: " << (unsigned) b_cnt[v] << "\n";
+				b_cnt[v] += trait_type::full_word_rank(data, i, v);
 			}
 		}
-
-		// if (v->size() == 512)
-		// 	std::cout << "i = " << i << "\n";
 
 		if (!(i & 0x7)) // v == 0
 			j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
 
 		for (value_type v = 0; v < t_v - 1; ++v) {
 			if (!(i & 0x7)) { // if i%8 == 0
-				// std::cout << "v=" << (unsigned) v << ": " << (j - 2 * (t_v - 2 - v) - 1) << ", " << j << ", " << (j - 2 * (t_v - 2 - v) - 2) << "\n";
-				m_basic_block[j - 2 * (t_v - 2 - v) - 1] = b_cnt_word[v];
-				m_basic_block[j + 2 * v] = m_basic_block[j - 2 * (t_v - 2 - v) - 2] + b_cnt[v];
+				size_type block_pos = j - 2 * (t_v - 2 - v) - 1;
+				m_basic_block[block_pos] = b_cnt_word[v];
+				m_basic_block[j + 2 * v] = m_basic_block[block_pos - 1] + b_cnt[v];
 				m_basic_block[j + 2 * v + 1] = 0;
 			} else { // if i%8 != 0
-				// std::cout << "full 8*word_rank cum (" << (unsigned) v << "): " << (unsigned) b_cnt_word[v] << "\n";
 				b_cnt_word[v] |= b_cnt[v] << (8 * (i & 0x7));
 				m_basic_block[j + 2 * v + 1] = b_cnt_word[v];
-				// std::cout << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
 			}
 		}
 
@@ -167,32 +146,6 @@ public:
 		// 	printWord(m_basic_block[x]);
 		// 	std::cout /*<< std::bitset<64>(m_basic_block[x])*/ << std::endl;
 		// }
-
-		// size_type j = 0;
-		// uint64_t sum = 0;
-		// uint64_t block_cnt = 0;
-		// for (size_type i = 1; i < (m_v->capacity() >> 6); ++i) {
-		// 	for (value_type v = 0; v < t_v - 1; ++v) {
-		// 		if (!(i & 0x7)) { // if i%8==0
-		// 			j += 2;
-		// 			m_basic_block[j - 1] = block_cnt;
-		// 			m_basic_block[j]	 = m_basic_block[j - 2] + sum;
-		// 			block_cnt = sum = 0;
-		// 		} else {
-		// 			block_cnt |= sum << (63 - 9 * (i & 0x7)); //  54, 45, 36, 27, 18, 9, 0
-		// 		}
-		// 		sum += trait_type::full_word_rank(*(++data));
-		// 	}
-		// }
-		// if (i & 0x7) { // if i%8 != 0
-		// 	block_cnt |= sum << (63 - 9 * (i & 0x7));
-		// 	m_basic_block[j + 1] = block_cnt;
-		// } else { // if i%8 == 0
-		// 	j += 2;
-		// 	m_basic_block[j - 1] = block_cnt;
-		// 	m_basic_block[j]	 = m_basic_block[j - 2] + sum;
-		// 	m_basic_block[j + 1] = 0;
-		// }
 	}
 
 	rank_support_int_v(const rank_support_int_v&) = default;
@@ -212,27 +165,6 @@ public:
 		const uint64_t* p = m_basic_block.data() + word_pos; // 2*(idx*t_b/512) + 2*v
 
 		// if (idx == 512 && v == 0) {
-		//
-		// 	for (unsigned x = 0; x < m_basic_block.size(); ++x)
-		// 	{
-		// 		if (x % 6 == 0)
-		// 			std::cout << "---------------------------------------------------------------------\n";
-		// 		if (x % 2 == 0)
-		// 			std::cout << "sb ";
-		// 		else
-		// 			std::cout << "b  ";
-		//
-		// 		if (x % 6 == 0 || x % 6 == 1)
-		// 			std::cout << "A  ";
-		// 		else if (x % 6 == 2 || x % 6 == 3)
-		// 			std::cout << "C  ";
-		// 		else
-		// 			std::cout << "G  ";
-		//
-		// 		printWord(m_basic_block[x]);
-		// 		std::cout /*<< std::bitset<64>(m_basic_block[x])*/ << std::endl;
-		// 	}
-		//
 		// 	std::cout << "rank(" << idx << ", " << (unsigned) v
 		// 			  << ") - sb: " << *p
 		// 			  //<< " shift by " << ((8 * (((idx * t_b) & 0x1FF) / 64))) << " ... "
@@ -243,18 +175,11 @@ public:
 		// 	std::cout << "word_pos: " << word_pos << "\n";
 		// }
 
-		if (idx & (0x1F)) // nur für DNA-alphabet   							 // if (idx%32)!=0
+		if (idx & (0x1F)) // if (idx % 32 != 0) nur für DNA-alphabet
 			return *p + ((*(p + 1) >> (8 * (((idx * t_b) & 0x1FF) / 64))) & 0b11111111) +
 				   trait_type::word_rank(m_v->data(), idx, v);
 		else
 			return *p + ((*(p + 1) >> (8 * (((idx * t_b) & 0x1FF) / 64))) & 0b11111111);
-
-		// const uint64_t* p = m_basic_block.data() + ((idx >> 8) & 0xFFFFFFFFFFFFFFFEULL); // (idx/512)*2
-		// if (idx & 0x3F)												 // if (idx%64)!=0
-		// 	return *p + ((*(p + 1) >> (63 - 9 * ((idx & 0x1FF) >> 6))) & 0x1FF) +
-		// 		   trait_type::word_rank(m_v->data(), idx);
-		// else
-		// 	return *p + ((*(p + 1) >> (63 - 9 * ((idx & 0x1FF) >> 6))) & 0x1FF);
 	}
 
 	inline size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); }

@@ -56,6 +56,7 @@ private:
 
 public:
 
+	// TODO: set_vector needed by util::init_support!!!
 	// TODO: prefix_rank und rank methoden trennen. subtraktion schon in bitvektor und nicht erst nach popcount (d.h. 1x popcount weniger)
 
 	static void printWord(uint64_t x)
@@ -85,12 +86,14 @@ public:
 		// ..... | superblock a | 8 blöcke a | superblock b | 8 blöcke b | superblock c | 8 blöcke c | .....
 		// ..... |---------------------------|---------------------------|---------------------------| .....
 
+		// (t_v - 1) * (64 + 64) + 8 * 64 = 3 * 128 + 512
+
 		size_type basic_block_size = ((v->capacity() >> 9) + 1) * 2 * (t_v - 1);
 		m_basic_block.resize(basic_block_size); // resize structure for basic_blocks
 		const uint64_t* data = m_v->data();
 
 		size_type i = 1, j = 0;
-		uint64_t b_cnt[t_v - 1] = {0};
+		uint64_t b_cnt[t_v - 1]= {0};
 		uint64_t b_cnt_word[t_v - 1] = {0};
 
 		for (value_type v = 0; v < t_v - 1; ++v) {
@@ -100,22 +103,20 @@ public:
 
 		for (; i < (m_v->capacity() >> 6) + 1; ++i) {
 			for (value_type v = 0; v < t_v - 1; ++v) { // TODO: maybe switch loop over v and if statement over i % 8 (order)
-				if (!(i & 0x7)) { // if i%8==0
-					if (!v) // v == 0
-						j += 2 * (t_v - 1); // first character, i.e. we move to the next superblock
-					size_type block_pos = j - 2 * (t_v - 2 - v) - 1;
-					m_basic_block[block_pos] = b_cnt_word[v];
-					m_basic_block[j + 2*v] = m_basic_block[block_pos - 1] + b_cnt[v];
-					b_cnt[v] = b_cnt_word[v] = 0;
-				} else {
+				if (likely(i & 0x7)) { // if i%8!=0
 					b_cnt_word[v] |= b_cnt[v] << ((i & 0x7) << 3); // 48 40 32 24 16 8 0
+				} else {
+					m_basic_block[j + 1] = b_cnt_word[v];
+					m_basic_block[j + 2 * (t_v - 1)] = m_basic_block[j] + b_cnt[v];
+					b_cnt[v] = b_cnt_word[v] = 0;
+					j += 2;
 				}
 				b_cnt[v] += trait_type::full_word_rank(data, i, v);
 			}
 		}
 
-		for (value_type v = 0; v < t_v - 1; ++v) {
-			m_basic_block[j + 2*v + 1] = b_cnt_word[v];
+		for (value_type v = 0; v < t_v - 1; ++v, j += 2) {
+			m_basic_block[j + 1] = b_cnt_word[v];
 		}
 
 		// for (unsigned x = 0; x < m_basic_block.size(); ++x)

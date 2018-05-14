@@ -36,20 +36,23 @@ private:
     constexpr static uint8_t t_v = 1ULL << t_b;
 
 public:
-	explicit rank_support_int_scan(const int_vector<t_b>* v = nullptr) : rank_support_int<t_b>(v){};
+	explicit rank_support_int_scan(const int_vector<t_b>* v = nullptr) : rank_support_int<t_b>(v){
+    	rank_support_int_trait<t_b>::init();
+	};
 	rank_support_int_scan(const rank_support_int_scan& rs) = default;
 	rank_support_int_scan(rank_support_int_scan&& rs)	  = default;
 	rank_support_int_scan& operator=(const rank_support_int_scan& rs) = default;
 	rank_support_int_scan& operator=(rank_support_int_scan&& rs) = default;
 	size_type rank(size_type idx, const value_type v) const;
 	size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); };
-	size_type					   size() const { return m_v->size(); };
-	size_type
-	serialize(std::ostream& out, structure_tree_node* v = nullptr, std::string name = "") const
+	size_type prefix_rank(size_type idx, const value_type v) const;
+	size_type size() const { return m_v->size(); };
+	size_type serialize(std::ostream& out, structure_tree_node* v = nullptr, std::string name = "") const
 	{
 		return serialize_empty_object(out, v, name, this);
 	}
 	void load(std::istream&, const int_vector<t_b>* v = nullptr) { m_v = v; }
+	void set_vector(const int_vector<t_b>* v = nullptr) { m_v = v; }
 };
 
 template <uint8_t t_b>
@@ -58,15 +61,43 @@ rank_support_int_scan<t_b>::rank(size_type idx, const value_type v) const
 {
 	assert(m_v != nullptr);
 	assert(idx <= m_v->size());
+
+	if (unlikely(v == 0))
+		return prefix_rank(idx, v);
+
+	const uint64_t* p = m_v->data();
+	size_type i = 0;
+	size_type result = 0;
+	size_type word_pos = (idx * t_b) >> 6;
+	while (i < word_pos) {
+		result += rank_support_int_trait<t_b>::full_word_rank(p, i, v);
+				// - rank_support_int_trait<t_b>::full_word_prefix_rank(p, i, v - 1);
+		++i;
+	}
+	// result += rank_support_int_trait<t_b>::word_prefix_rank(p, idx, v);
+			// - rank_support_int_trait<t_b>::word_prefix_rank(p, idx, v - 1);
+	return result + rank_support_int_trait<t_b>::word_rank(p, idx, v);
+}
+
+template <uint8_t t_b>
+inline typename rank_support_int_scan<t_b>::size_type
+rank_support_int_scan<t_b>::prefix_rank(size_type idx, const value_type v) const
+{
+	assert(m_v != nullptr);
+	assert(idx <= m_v->size());
+
+	if (unlikely(v == t_v - 1))
+		return idx;
+
 	const uint64_t* p	    = m_v->data();
 	size_type		word_pos = (idx * t_b) >> 6;
 	size_type       i       = 0;
 	size_type		result  = 0;
 	while (i < word_pos) {
-		result += rank_support_int_trait<t_b>::full_word_rank(p, i, v);
+		result += rank_support_int_trait<t_b>::full_word_prefix_rank(p, i, v);
 		++i;
 	}
-	return result + rank_support_int_trait<t_b>::word_rank(p, idx, v);
+	return result + rank_support_int_trait<t_b>::word_prefix_rank(p, idx, v);
 }
 
 } // end namespace sds

@@ -19,6 +19,9 @@
 
 #include <bitset>
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
 //! Namespace for the succinct data structure library.
 namespace sdsl {
 
@@ -55,6 +58,13 @@ public:
 	virtual size_type rank(size_type i, const value_type v) const = 0;
 	//! Alias for rank(i)
 	virtual size_type operator()(size_type idx, const value_type v) const = 0;
+	//! Answers rank queries for the supported bit_vector.
+	/*!	\param i Argument for the length of the prefix v[0..i-1].
+        	\returns Number of 1-bits in the prefix [0..i-1] of the supported bit_vector.
+        	\note Method init has to be called before the first call of rank.
+        	\sa init
+         */
+	virtual size_type prefix_rank(size_type i, const value_type v) const = 0;
 	//! Serializes rank_support.
 	/*! \param out Out-Stream to serialize the data to.
         */
@@ -70,7 +80,7 @@ public:
     //      *  \note Method init has to be called before the next call of rank.
     //      *  \sa init, rank
     //      */
-	// virtual void set_vector(const int_vector<t_b>* v = nullptr) = 0;
+	virtual void set_vector(const int_vector<t_b>* v = nullptr) = 0;
 };
 
 template <uint8_t t_b>
@@ -117,11 +127,23 @@ public:
 
     static uint64_t set_positions(uint64_t w, const value_type v)
     {
+		// uint64_t res = (masks[v] - (even_mask & w)) & carry_select_mask;
+		// res |= ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
+        uint64_t w_even = even_mask & w;
+        uint64_t w_odd = even_mask & (w >> t_b);
+		uint64_t res = ((masks[v] - w_even) & ~(masks[v - 1] - w_even)) & carry_select_mask;
+		res |= (((masks[v] - w_odd) & ~(masks[v-1] - w_odd)) & carry_select_mask) << 1;
+		return res;
+    }
+
+    static uint64_t set_positions_prefix(uint64_t w, const value_type v)
+    {
 		uint64_t res = (masks[v] - (even_mask & w)) & carry_select_mask;
 		res |= ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
 		return res;
     }
 
+        // assumptions?
 	static uint32_t word_rank(const uint64_t* data, const size_type idx, const value_type v)
 	{
 		size_type bit_pos = idx * t_b;
@@ -129,10 +151,26 @@ public:
 		return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
 	}
 
+    // assumptions?
 	static uint32_t full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v)
 	{
 		uint64_t w = *(data + word_pos);
 		return bits::cnt(set_positions(w, v));
+	}
+
+    // assumptions?
+	static uint32_t word_prefix_rank(const uint64_t* data, const size_type idx, const value_type v)
+	{
+		size_type bit_pos = idx * t_b;
+		uint64_t w = *(data + (bit_pos >> 6));
+		return bits::cnt(set_positions_prefix(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
+	}
+
+    // assumptions?
+	static uint32_t full_word_prefix_rank(const uint64_t* data, const size_type word_pos, const value_type v)
+	{
+		uint64_t w = *(data + word_pos);
+		return bits::cnt(set_positions_prefix(w, v));
 	}
 };
 

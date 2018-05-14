@@ -10,9 +10,6 @@
 
 #include "rank_support.hpp"
 
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)     __builtin_expect((x),0)
-
 //! Namespace for the succinct data structure library.
 namespace sdsl {
 
@@ -98,7 +95,7 @@ public:
 
 		for (value_type v = 0; v < t_v - 1; ++v) {
 			m_basic_block[2*v] = m_basic_block[2*v + 1] = 0;
-			b_cnt[v] = trait_type::full_word_rank(data, 0, v);
+			b_cnt[v] = trait_type::full_word_prefix_rank(data, 0, v);
 		}
 
 		for (; i < (m_v->capacity() >> 6) + 1; ++i) {
@@ -111,7 +108,7 @@ public:
 					b_cnt[v] = b_cnt_word[v] = 0;
 					j += 2;
 				}
-				b_cnt[v] += trait_type::full_word_rank(data, i, v);
+				b_cnt[v] += trait_type::full_word_prefix_rank(data, i, v);
 			}
 		}
 
@@ -150,6 +147,35 @@ public:
 		assert(m_v != nullptr);
 		assert(idx <= m_v->size());
 
+		if (v == 0)
+			return prefix_rank(idx, v);
+
+		uint64_t word_pos = (2 * (t_v - 1) * (((idx * t_b) >> 9))) + 2 * v;
+		const uint64_t* p = m_basic_block.data() + word_pos; // 2*(idx*t_b/512) + 2*v
+
+		size_type result = 0;
+		if (unlikely(v == t_v - 1)) // TODO: test effect of likely/unlikely
+			result = idx;
+		else
+		 	result = *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
+		result -= *(p - 2) + ((*(p - 2 + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
+		
+		if (likely(idx & 0x1F)) { // TODO: ein word_rank!
+			if (likely(v != t_v - 1)) // if (idx % 32 != 0) nur für DNA-alphabet
+				result += trait_type::word_rank(m_v->data(), idx, v);
+			else
+				result -= trait_type::word_prefix_rank(m_v->data(), idx, v - 1);
+		}
+		return result;
+	}
+
+	inline size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); }
+
+	size_type prefix_rank(size_type idx, const value_type v) const
+	{
+		assert(m_v != nullptr);
+		assert(idx <= m_v->size());
+
 		if (unlikely(v == t_v - 1)) // TODO: test effect of likely/unlikely
 			return idx;
 
@@ -170,12 +196,10 @@ public:
 		// TODO: test effect of likely/unlikely
 		if (likely(idx & (0x1F))) // if (idx % 32 != 0) nur für DNA-alphabet
 			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF) +
-				   trait_type::word_rank(m_v->data(), idx, v);
+				   trait_type::word_prefix_rank(m_v->data(), idx, v);
 		else
 			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
 	}
-
-	inline size_type operator()(size_type idx, const value_type v) const { return rank(idx, v); }
 
 	size_type size() const { return m_v->size(); }
 
@@ -194,6 +218,8 @@ public:
 		m_v = v;
 		m_basic_block.load(in);
 	}
+
+	void set_vector(const int_vector<t_b>* v = nullptr) { m_v = v; }
 };
 
 } // end namespace sds

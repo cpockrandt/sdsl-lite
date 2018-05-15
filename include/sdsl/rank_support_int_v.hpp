@@ -35,28 +35,26 @@ namespace sdsl {
  *
  * @ingroup rank_support_group
  */
-template <uint8_t t_b>
-class rank_support_int_v : public rank_support_int<t_b> {
+class rank_support_int_v : public rank_support_int {
 public:
-	typedef int_vector<t_b> int_vector_type;
-	typedef rank_support_int_trait<t_b> trait_type;
-	typedef typename rank_support_int<t_b>::size_type size_type;
-	typedef typename rank_support_int<t_b>::value_type value_type;
+	typedef int_vector<> int_vector_type;
+	typedef typename rank_support_int::size_type size_type;
+	typedef typename rank_support_int::value_type value_type;
 	// enum { bit_pat = t_b };
 	// enum { bit_pat_len = t_pat_len };
-	static_assert(t_b == 2, "Currently only for t_b = 2 implemented");
+	// static_assert(t_b == 2, "Currently only for t_b = 2 implemented");
 private:
-	using rank_support_int<t_b>::m_v;
+	// using rank_support_int::m_v;
 	// basic block for interleaved storage of superblockrank and blockrank
 	int_vector<64> m_basic_block;
-	constexpr static uint8_t t_v = 1ULL << t_b;
+	// constexpr static uint8_t t_v = 1ULL << t_b;
 
 public:
 
 	// TODO: set_vector needed by util::init_support!!!
 	// TODO: prefix_rank und rank methoden trennen. subtraktion schon in bitvektor und nicht erst nach popcount (d.h. 1x popcount weniger)
 
-	static void printWord(uint64_t x)
+	void printWord(uint64_t x) const
 	{
 		std::bitset<64> b(x);
     	for (signed i = 63; i >= 0; --i) {
@@ -66,9 +64,9 @@ public:
 		}
 	}
 
-	explicit rank_support_int_v(const int_vector<t_b>* v = nullptr)
+	explicit rank_support_int_v(const int_vector<>* v = nullptr, unsigned max_val = 0) : rank_support_int(v, max_val)
 	{
-		m_v = v;
+		// m_v = v;
 		if (v == nullptr) {
 			return;
 		} else if (v->empty()) {
@@ -95,7 +93,7 @@ public:
 
 		for (value_type v = 0; v < t_v - 1; ++v) {
 			m_basic_block[2*v] = m_basic_block[2*v + 1] = 0;
-			b_cnt[v] = trait_type::full_word_prefix_rank(data, 0, v);
+			b_cnt[v] = full_word_prefix_rank(data, 0, v);
 		}
 
 		for (; i < (m_v->capacity() >> 6) + 1; ++i) {
@@ -108,7 +106,7 @@ public:
 					b_cnt[v] = b_cnt_word[v] = 0;
 					j += 2;
 				}
-				b_cnt[v] += trait_type::full_word_prefix_rank(data, i, v);
+				b_cnt[v] += full_word_prefix_rank(data, i, v);
 			}
 		}
 
@@ -159,12 +157,12 @@ public:
 		else
 		 	result = *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
 		result -= *(p - 2) + ((*(p - 2 + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
-		
+
 		if (likely(idx & 0x1F)) { // TODO: ein word_rank!
 			if (likely(v != t_v - 1)) // if (idx % 32 != 0) nur für DNA-alphabet
-				result += trait_type::word_rank(m_v->data(), idx, v);
+				result += word_rank(m_v->data(), idx, v);
 			else
-				result -= trait_type::word_prefix_rank(m_v->data(), idx, v - 1);
+				result -= word_prefix_rank(m_v->data(), idx, v - 1);
 		}
 		return result;
 	}
@@ -196,7 +194,7 @@ public:
 		// TODO: test effect of likely/unlikely
 		if (likely(idx & (0x1F))) // if (idx % 32 != 0) nur für DNA-alphabet
 			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF) +
-				   trait_type::word_prefix_rank(m_v->data(), idx, v);
+				   word_prefix_rank(m_v->data(), idx, v);
 		else
 			return *p + ((*(p + 1) >> ((((idx * t_b) & 0x1FF) >> 6) << 3)) & 0xFF);
 	}
@@ -213,13 +211,13 @@ public:
 		return written_bytes;
 	}
 
-	void load(std::istream& in, const int_vector<t_b>* v = nullptr)
+	void load(std::istream& in, const int_vector<>* v = nullptr)
 	{
 		m_v = v;
 		m_basic_block.load(in);
 	}
 
-	void set_vector(const int_vector<t_b>* v = nullptr) { m_v = v; }
+	void set_vector(const int_vector<>* v = nullptr) { m_v = v; }
 };
 
 } // end namespace sds

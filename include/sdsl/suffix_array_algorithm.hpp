@@ -269,7 +269,7 @@ SDSL_UNUSED typename std::enable_if<t_wt::lex_ordered, csa_tag>::type x = csa_ta
 	typename csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>::size_type
 			  size_type;
 	size_type c_begin = csa_fwd.C[csa_fwd.char2comp[c]];
-	auto	  r_s_b   = csa_fwd.wavelet_tree.lex_count(l_fwd, r_fwd + 1, c);
+	auto      r_s_b   = csa_fwd.bwt.rank_interval(l_fwd, r_fwd + 1, c);
 	size_type rank_l  = std::get<0>(r_s_b);
 	size_type s = std::get<1>(r_s_b), b = std::get<2>(r_s_b);
 	size_type rank_r = r_fwd - l_fwd - s - b + rank_l;
@@ -318,10 +318,11 @@ template <class t_pat_iter,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
 typename csa_wt<>::size_type bidirectional_search_backward(
-const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>& csa_fwd,
-SDSL_UNUSED const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>&
+const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>& csa_fwd,
+SDSL_UNUSED const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>&
 				  csa_bwd,
 typename csa_wt<>::size_type  l_fwd,
 typename csa_wt<>::size_type  r_fwd,
@@ -392,11 +393,12 @@ template <class t_pat_iter,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
 typename csa_wt<t_wt>::size_type bidirectional_search_forward(
-SDSL_UNUSED const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>&
+SDSL_UNUSED const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>&
 				  csa_fwd,
-const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>& csa_bwd,
+const csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>& csa_bwd,
 typename csa_wt<>::size_type  l_fwd,
 typename csa_wt<>::size_type  r_fwd,
 typename csa_wt<>::size_type  l_bwd,

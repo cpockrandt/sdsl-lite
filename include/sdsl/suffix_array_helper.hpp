@@ -397,6 +397,31 @@ public:
          */
 	size_type rank(size_type i, const char_type c) const { return m_csa.rank_bwt(i, c); }
 
+	//! Calculates how many symbols c are smaller/greater than c in [i..j-1].
+	/*!
+	 *  \param i Start index (inclusive) of the interval.
+	 *  \param j End index (exclusive) of the interval.
+	 *  \param c Symbol c.
+	 *  \return A triple containing:
+	 *          * rank(i,c)
+	 *          * #symbols smaller than c in [i..j-1]
+	 *          * #symbols greater than c in [i..j-1]
+	 *  \par Time complexity
+	 *        \f$ \Order{\log |\Sigma|} \f$
+	 */
+	/*typename std::enable_if<t_csa::wavelet_tree_type::shape_type::lex_ordered, */std::tuple<size_type, size_type, size_type>/* >::type*/
+	rank_interval(size_type i, size_type j, char_type c) const
+	{
+		if (m_csa.implicit_sentinel) {
+			i -= (i > m_csa.sentinel_pos);
+			j -= (j > m_csa.sentinel_pos);
+			c = m_csa.char2comp[c] - 1;
+		}
+		auto r_s_b = m_csa.wavelet_tree.lex_count(i, j, c);
+		std::get<1>(r_s_b) += (m_csa.implicit_sentinel && i <= m_csa.sentinel_pos && m_csa.sentinel_pos <= j);
+		return r_s_b;
+	}
+
 	//! Calculates the position of the i-th c.
 	/*!
          *  \param i The i-th occurrence. \f$i\in [1..rank(size(),c)]\f$.

@@ -69,7 +69,6 @@ class csa_wt {
 
 public:
 	enum { sa_sample_dens = t_dens, isa_sample_dens = t_inv_dens };
-	enum { implicit_sentinel = t_implicit_sentinel };
 
 	typedef uint64_t							 value_type;
 	typedef random_access_const_iterator<csa_wt> const_iterator;
@@ -130,6 +129,7 @@ public:
 	const sa_sample_type&						  sa_sample	= m_sa_sample;
 	const isa_sample_type&						  isa_sample   = m_isa_sample;
 	const wavelet_tree_type&					  wavelet_tree = m_wavelet_tree;
+	static constexpr bool						  implicit_sentinel = t_implicit_sentinel;
 
 	//! Default constructor
 	csa_wt() = default;
@@ -261,7 +261,9 @@ private:
             i = i - (i > m_sentinel_pos);
             return m_wavelet_tree.rank(i, cc-1);
         }
-        return m_wavelet_tree.rank(i, c);
+        else {
+            return m_wavelet_tree.rank(i, c);
+        }
     }
 
 	// Calculates the position of the i-th c in the BWT of the original text.
@@ -298,8 +300,9 @@ template <class t_wt,
 		  uint32_t t_inv_dens,
 		  class t_sa_sample_strat,
 		  class t_isa,
-		  class t_alphabet_strat>
-csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat>::csa_wt(
+		  class t_alphabet_strat,
+		  bool t_implicit_sentinel>
+csa_wt<t_wt, t_dens, t_inv_dens, t_sa_sample_strat, t_isa, t_alphabet_strat, t_implicit_sentinel>::csa_wt(
 cache_config& config)
 {
 	if (!cache_file_exists(key_bwt<alphabet_type::int_width>(), config)) {
@@ -332,7 +335,7 @@ cache_config& config)
 
 		// size_type n = bwt_buf.size();
 
-		if (t_implicit_sentinel) {
+		if (implicit_sentinel) {
 		    std::string id = "_" + util::to_string(util::pid()) + "_" + util::to_string(util::id());
 		    std::string tmp_bwt_file = bwt_file + id;
 		    {
@@ -350,8 +353,7 @@ cache_config& config)
 		        }
 		    }
 		    int_vector_buffer<alphabet_type::int_width> tmp_bwt_buf(tmp_bwt_file);
-		    wavelet_tree_type tmp_wt(tmp_bwt_buf, tmp_bwt_buf.size());
-		    m_wavelet_tree.swap(tmp_wt);
+		    m_wavelet_tree = wavelet_tree_type(tmp_bwt_buf.begin(), tmp_bwt_buf.end(), config.dir);
 		    tmp_bwt_buf.close();
 		    sdsl::remove(tmp_bwt_file);
 		} else {
@@ -400,7 +402,7 @@ std::ostream& out, structure_tree_node* v, std::string name) const -> size_type
 	written_bytes += m_isa_sample.serialize(out, child, "isa_samples");
 	written_bytes += m_alphabet.serialize(out, child, "alphabet");
 	if (implicit_sentinel) {
-		written_bytes +=  m_sentinel_pos.serialize(out, child, "sentinel_pos");
+		written_bytes += write_member(m_sentinel_pos, out, child, "sentinel_pos");
 	}
 	structure_tree::add_size(child, written_bytes);
 	return written_bytes;
@@ -421,7 +423,7 @@ std::istream& in)
 	m_isa_sample.load(in, &m_sa_sample);
 	m_alphabet.load(in);
 	if (implicit_sentinel) {
-		m_sentinel_pos.load(in);
+		read_member(m_sentinel_pos, in);
 	}
 }
 

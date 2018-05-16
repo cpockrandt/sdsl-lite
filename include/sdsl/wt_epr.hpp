@@ -11,6 +11,7 @@
 
 #include "bit_vectors.hpp"
 #include "rank_support.hpp"
+#include "rank_support_int.hpp"
 #include "select_support.hpp"
 #include "wt_helper.hpp"
 #include <vector>
@@ -342,13 +343,15 @@ public:
 		// 	smaller = m_bv_rank.prefix_rank(j, c-1) - m_bv_rank.prefix_rank(i, c-1);
 		// size_type rank = m_bv_rank.rank(i, c);
 
-		size_type prefix_i_c = m_bv_rank.prefix_rank(i, c);
-		size_type prefix_i_c_1 = m_bv_rank.prefix_rank(i, c-1);
-
 		size_type smaller = 0;
+		size_type prefix_i_c = m_bv_rank.prefix_rank(i, c);
+		size_type prefix_i_c_1 = 0;
 		size_type greater = j - i - m_bv_rank.prefix_rank(j, c) + prefix_i_c;
 		if (c > 0)
+		{
+			prefix_i_c_1 = m_bv_rank.prefix_rank(i, c-1);
 			smaller = m_bv_rank.prefix_rank(j, c-1) - prefix_i_c_1;
+		}
 		size_type rank = prefix_i_c - prefix_i_c_1;
 
 		return t_ret_type{rank, smaller, greater};

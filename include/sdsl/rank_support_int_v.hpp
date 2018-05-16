@@ -52,7 +52,6 @@ private:
 public:
 
 	// TODO: set_vector needed by util::init_support!!!
-	// TODO: prefix_rank und rank methoden trennen. subtraktion schon in bitvektor und nicht erst nach popcount (d.h. 1x popcount weniger)
 
 	void printWord(uint64_t x) const
 	{

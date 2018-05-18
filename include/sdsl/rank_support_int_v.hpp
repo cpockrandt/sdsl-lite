@@ -63,7 +63,7 @@ public:
 		}
 	}
 
-	explicit rank_support_int_v(const int_vector<>* v = nullptr, unsigned max_val = 0) : rank_support_int(v, max_val)
+	explicit rank_support_int_v(const int_vector<>* v = nullptr, unsigned max_val = 3) : rank_support_int(v, max_val)
 	{
 		// m_v = v;
 		if (v == nullptr) {
@@ -214,6 +214,7 @@ public:
 	{
 		m_v = v;
 		m_basic_block.load(in);
+		init(v, 0);
 	}
 
 	void set_vector(const int_vector<>* v = nullptr) { m_v = v; }

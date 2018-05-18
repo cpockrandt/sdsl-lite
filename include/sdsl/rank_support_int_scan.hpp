@@ -36,7 +36,7 @@ private:
 	// using rank_support_int::t_v;
 
 public:
-	explicit rank_support_int_scan(const int_vector<>* v = nullptr, unsigned maxval = 0) : rank_support_int(v, maxval){
+	explicit rank_support_int_scan(const int_vector<>* v = nullptr, unsigned maxval = 3) : rank_support_int(v, maxval){
     	// rank_support_int_trait<>::init();
 	};
 	rank_support_int_scan(const rank_support_int_scan& rs) = default;
@@ -51,7 +51,7 @@ public:
 	{
 		return serialize_empty_object(out, v, name, this);
 	}
-	void load(std::istream&, const int_vector<>* v = nullptr) { m_v = v; }
+	void load(std::istream&, const int_vector<>* v = nullptr) { m_v = v; init(v, 0); }
 	void set_vector(const int_vector<>* v = nullptr) { m_v = v; }
 
 	void print() const {

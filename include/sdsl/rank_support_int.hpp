@@ -97,13 +97,46 @@ protected:
         return bits::cnt(set_positions_prefix(w, v));
     }
 
+    void init(const int_vector<>* v, unsigned max_val)
+    {
+        if (v != nullptr) {
+            m_v = v;
+            t_b = m_v->width();
+            if (max_val == 0)
+            {
+                for (unsigned i = 0; i < m_v->size(); ++i)
+                    if ((*m_v)[i] > max_val)
+                        max_val = (*m_v)[i];
+            }
+
+            t_v = 1ULL << t_b;//max_val + 1;
+
+            even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
+            carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);
+
+            masks.resize(t_v);
+            for (value_type v = 0; v < t_v; ++v)
+            {
+                masks[v] = v;
+                for (uint8_t i = t_b * 2; i < 64; i <<= 1)
+                    masks[v] |= masks[v] << i;
+            }
+
+            uint64_t tmp_carry = masks[1];
+            for (value_type v = 0; v < t_v; ++v)
+                masks[v] |= tmp_carry << t_b;
+
+            masks.shrink_to_fit();
+        }
+    }
+
 
 
 public:
 	//! Constructor
 	/*! \param v The supported bit_vector.
          */
-	rank_support_int(const int_vector<>* v = nullptr, unsigned max_val = 0); // TODO: two separate constructors?
+	rank_support_int(const int_vector<>* v = nullptr, unsigned max_val = 3); // TODO: two separate constructors?
 	//! Copy constructor
 	rank_support_int(const rank_support_int&) = default;
 	rank_support_int(rank_support_int&&)	  = default;
@@ -148,35 +181,7 @@ public:
 
 inline rank_support_int::rank_support_int(const int_vector<>* v, unsigned max_val)
 {
-    if (v != nullptr) {
-        m_v = v;
-        t_b = m_v->width();
-        if (max_val == 0)
-        {
-            for (unsigned i = 0; i < m_v->size(); ++i)
-                if ((*m_v)[i] > max_val)
-                    max_val = (*m_v)[i];
-        }
-
-        t_v = 1ULL << t_b;//max_val + 1;
-
-    	even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
-    	carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);
-
-        masks.resize(t_v);
-        for (value_type v = 0; v < t_v; ++v)
-        {
-            masks[v] = v;
-            for (uint8_t i = t_b * 2; i < 64; i <<= 1)
-                masks[v] |= masks[v] << i;
-        }
-
-        uint64_t tmp_carry = masks[1];
-        for (value_type v = 0; v < t_v; ++v)
-            masks[v] |= tmp_carry << t_b;
-
-        masks.shrink_to_fit();
-    }
+    init(v, max_val);
 }
 
 

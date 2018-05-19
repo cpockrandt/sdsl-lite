@@ -144,7 +144,7 @@ public:
 		assert(m_v != nullptr);
 		assert(idx <= m_v->size());
 
-		if (v == 0)
+		if (unlikely(v == 0))
 			return prefix_rank(idx, v);
 
 		uint64_t word_pos = (2 * (t_v - 1) * (((idx * t_b) >> 9))) + 2 * v;

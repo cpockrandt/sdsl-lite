@@ -12,6 +12,7 @@
 #include "bit_vectors.hpp"
 #include "rank_support.hpp"
 #include "rank_support_int.hpp"
+#include "int_vector_il.hpp"
 #include "select_support.hpp"
 #include "wt_helper.hpp"
 #include <vector>
@@ -129,15 +130,19 @@ public:
 		// 2. Calculate effective alphabet size
 		calculate_effective_alphabet_size(C, m_sigma);
 		// 4. Generate wavelet tree bit sequence m_bv
-		m_bv.width(std::ceil(std::log2(m_sigma)));
-		m_bv.resize(m_size);
+
+		int_vector<> m_bv_tmp;
+		m_bv_tmp.width(std::ceil(std::log2(m_sigma)));
+		m_bv_tmp.resize(m_size);
 
 		// TODO: use byte_alphabet to reduce alphabet to [0..sigma-1]? but dont use by default, since inefficient!
 		// TODO: was wenn ein buchstaben gesucht wird, der nicht vorkommt?
 		size_type idx = 0;
 		for (t_it it = begin; it != end; ++it) {
-			m_bv[idx++] = *it;
+			m_bv_tmp[idx++] = *it;
 		}
+		bit_vector_type m_bv2(m_bv_tmp);
+		m_bv = std::move(m_bv2); // swap its content with the target object
 		// 5. Initialize rank and select data structures for m_bv
 		construct_init_rank_select();
 	}

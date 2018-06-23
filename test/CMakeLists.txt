@@ -1,4 +1,3 @@
-set(sdsl_tests "")
 set(generated_files "")
 
 ## Create targets to downloads file specified in download.config
@@ -64,9 +63,9 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/../include
 
 link_libraries(gtest divsufsort divsufsort64)
 
-add_executable(int_vector_generator EXCLUDE_FROM_ALL int_vector_generator.cpp)
-add_executable(bit_vector_generator EXCLUDE_FROM_ALL bit_vector_generator.cpp)
-add_executable(replace_int_vector_value EXCLUDE_FROM_ALL replace_int_vector_value.cpp)
+add_executable(int_vector_generator int_vector_generator.cpp)
+add_executable(bit_vector_generator bit_vector_generator.cpp)
+add_executable(replace_int_vector_value replace_int_vector_value.cpp)
 
 set(tmp_dirs "${CMAKE_CURRENT_LIST_DIR}/tmp/" "@/")
 set(tmp_dirs_suffix "" "-im")
@@ -76,7 +75,7 @@ foreach(test_source ${test_sources})
 
     string(REGEX REPLACE "_" "-" test_name_hy ${test_name_we})
 
-    add_executable(${test_name_we} EXCLUDE_FROM_ALL ${test_name_we}.cpp)
+    add_executable(${test_name_we} ${test_name_we}.cpp) # EXCLUDE_FROM_ALL
 
     string(REGEX REPLACE "_[0-9]_" "_" config_name ${test_name_we})
     set(config_file ${CMAKE_CURRENT_SOURCE_DIR}/${config_name}.config)
@@ -95,7 +94,11 @@ foreach(test_source ${test_sources})
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                 COMMENT "Execute ${test_name}."
             )
-            list(APPEND sdsl_tests ${test_name})
+
+            add_test(NAME ${test_name}
+                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                COMMAND $<TARGET_FILE:${test_name_we}> ${tmp_dir}
+            )
 # (2) Handle tests with .config file        
         else()
             set(test_targets "")
@@ -119,6 +122,11 @@ foreach(test_source ${test_sources})
                         WORKING_DIRECTORY ${CMAKE_BINARY_DIR} 
                         COMMENT "Execute ${test_name} on ${test_case_name}."
                     )
+                    add_test(NAME ${test_target}
+                        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                        COMMAND $<TARGET_FILE:${test_name_we}> ${abs_test_case_name}
+                                                               ${tmp_dir}
+                    )
                     list(APPEND test_targets ${test_target})
 # (2.1) Handle tests with multiple files per line in the .config file 
                 else() 
@@ -138,6 +146,13 @@ foreach(test_source ${test_sources})
                             DEPENDS ${abs_test_case_name} ${test_name_we}
                             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                             COMMENT "Execute ${test_name} on ${test_case_name}."        
+                        )
+
+                        add_test(NAME ${test_target}
+                            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                            COMMAND $<TARGET_FILE:${test_name_we}> ${abs_test_case_name}
+                                                                   ${num_byte}
+                                                                   ${tmp_dir}
                         )
                         list(APPEND test_targets ${test_target})
 #               Handle K2TreapTest    
@@ -170,6 +185,7 @@ foreach(test_source ${test_sources})
                             endforeach(i)
                             add_custom_target(${test_case_name} 
                                     DEPENDS ${abs_test_case_name_list})
+                            add_test(NAME ${test_case_name})
                         endif()
                         set(test_target ${test_name}_${test_case_name})
                         add_custom_target(${test_target}
@@ -178,31 +194,22 @@ foreach(test_source ${test_sources})
                                     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                                     COMMENT "Execute ${test_name} on ${test_case_name}."
                                 )
+                        add_test(NAME ${test_target}
+                                COMMAND $<TARGET_FILE:${test_name_we}> ${abs_test_case_name} ${tmp_dir}
+                                WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
                         list(APPEND test_targets ${test_target})
                     endif()
                 endif()
             endforeach(config_line)
 
             add_custom_target(${test_name} DEPENDS ${test_targets}) 
-            list(APPEND sdsl_full_tests ${test_name})
-            if(NOT "${test_name}" MATCHES ".*-[0-9]+-.*" )  
-                list(APPEND sdsl_tests ${test_name})
-                message("Add test: ${test_name}")
-            else()
-                message("Additional test: ${test_name}")
-            endif()
         endif()
     endforeach(d)
 endforeach(test_source)
 
-add_custom_target(test-sdsl DEPENDS ${sdsl_tests})
-add_custom_target(test-full-sdsl DEPENDS ${sdsl_full_tests})
-
 list(REMOVE_DUPLICATES generated_files)
-#message("generated files = ${generated_files}")
+add_custom_target(generate_test_files ALL DEPENDS ${generated_files})
 
 add_custom_target(clean-test
                  COMMAND ${CMAKE_COMMAND} -E remove -f ${generated_files}
                  COMMENT "Remove generated test inputs.")
-
-

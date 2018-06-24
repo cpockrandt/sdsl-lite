@@ -185,7 +185,7 @@ foreach(test_source ${test_sources})
                             endforeach(i)
                             add_custom_target(${test_case_name} 
                                     DEPENDS ${abs_test_case_name_list})
-                            add_test(NAME ${test_case_name})
+                            # TODO: no add_test here?
                         endif()
                         set(test_target ${test_name}_${test_case_name})
                         add_custom_target(${test_target}

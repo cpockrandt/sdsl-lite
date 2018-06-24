@@ -41,7 +41,7 @@ if [ $? != 0 ]; then
 	echo "ERROR: CMake build failed."
 	exit 1
 fi
-make -j sdsl # run make
+#make -j sdsl # TODO!!! run make
 if [ $? != 0 ]; then
 	echo "ERROR: Build failed."
 	exit 1

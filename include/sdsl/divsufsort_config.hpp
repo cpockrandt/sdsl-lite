@@ -1,10 +1,6 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H 1
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 /** Define to the version of this package. **/
 #define PROJECT_VERSION_FULL "2.0.1-15-g22e6b23"
 
@@ -18,14 +14,6 @@ extern "C" {
 #define HAVE_MEMORY_H 1
 #define HAVE_SYS_TYPES_H 1
 
-/** for WinIO **/
-/* #undef HAVE_IO_H */
-/* #undef HAVE_FCNTL_H */
-/* #undef HAVE__SETMODE */
-/* #undef HAVE_SETMODE */
-/* #undef HAVE__FILENO */
-/* #undef HAVE_FOPEN_S */
-/* #undef HAVE__O_BINARY */
 #ifndef HAVE__SETMODE
 # if HAVE_SETMODE
 #  define _setmode setmode
@@ -36,20 +24,5 @@ extern "C" {
 #  define HAVE__O_BINARY 1
 # endif
 #endif
-
-/** for inline **/
-#ifndef INLINE
-# define INLINE inline
-#endif
-
-/** for VC++ warning **/
-#ifdef _MSC_VER
-#pragma warning(disable: 4127)
-#endif
-
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif /* __cplusplus */
 
 #endif /* _CONFIG_H */

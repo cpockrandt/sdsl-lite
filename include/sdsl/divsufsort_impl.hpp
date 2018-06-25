@@ -1,3 +1,64 @@
+/*
+ * sssort.c for libdivsufsort
+ * Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+ #define STACK_PUSH(_a, _b, _c, _d)\
+  do {\
+    assert(ssize < STACK_SIZE);\
+    stack[ssize].a = (_a), stack[ssize].b = (_b),\
+    stack[ssize].c = (_c), stack[ssize++].d = (_d);\
+  } while(0)
+#define STACK_PUSH5(_a, _b, _c, _d, _e)\
+  do {\
+    assert(ssize < STACK_SIZE);\
+    stack[ssize].a = (_a), stack[ssize].b = (_b),\
+    stack[ssize].c = (_c), stack[ssize].d = (_d), stack[ssize++].e = (_e);\
+  } while(0)
+#define STACK_POP(_a, _b, _c, _d)\
+  do {\
+    assert(0 <= ssize);\
+    if(ssize == 0) { return; }\
+    (_a) = stack[--ssize].a, (_b) = stack[ssize].b,\
+    (_c) = stack[ssize].c, (_d) = stack[ssize].d;\
+  } while(0)
+#define STACK_POP5(_a, _b, _c, _d, _e)\
+  do {\
+    assert(0 <= ssize);\
+    if(ssize == 0) { return; }\
+    (_a) = stack[--ssize].a, (_b) = stack[ssize].b,\
+    (_c) = stack[ssize].c, (_d) = stack[ssize].d, (_e) = stack[ssize].e;\
+  } while(0)
+/* for divsufsort.c */
+#define BUCKET_A(_c0) bucket_A[(_c0)]
+#if ALPHABET_SIZE == 256
+#define BUCKET_B(_c0, _c1) (bucket_B[((_c1) << 8) | (_c0)])
+#define BUCKET_BSTAR(_c0, _c1) (bucket_B[((_c0) << 8) | (_c1)])
+#else
+#define BUCKET_B(_c0, _c1) (bucket_B[(_c1) * ALPHABET_SIZE + (_c0)])
+#define BUCKET_BSTAR(_c0, _c1) (bucket_B[(_c0) * ALPHABET_SIZE + (_c1)])
+#endif
 
 static const int32_t lg_table[256]= {
  -1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
@@ -12,6 +73,7 @@ static const int32_t lg_table[256]= {
 
 #if (SS_BLOCKSIZE == 0) || (SS_INSERTIONSORT_THRESHOLD < SS_BLOCKSIZE)
 
+template <typename saidx_t>
 static inline
 int32_t
 ss_ilg(saidx_t n) {
@@ -73,6 +135,7 @@ static const int32_t sqq_table[256] = {
 247, 248, 248, 249, 249, 250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255
 };
 
+template <typename saidx_t>
 static inline
 saidx_t
 ss_isqrt(saidx_t x) {
@@ -106,6 +169,7 @@ ss_isqrt(saidx_t x) {
 /*---------------------------------------------------------------------------*/
 
 /* Compares two suffixes. */
+template <typename saidx_t>
 static inline
 int32_t
 ss_compare(const uint8_t *T,
@@ -132,6 +196,7 @@ ss_compare(const uint8_t *T,
 #if (SS_BLOCKSIZE != 1) && (SS_INSERTIONSORT_THRESHOLD != 1)
 
 /* Insertionsort for small size groups */
+template <typename saidx_t>
 static
 void
 ss_insertionsort(const uint8_t *T, const saidx_t *PA,
@@ -157,6 +222,7 @@ ss_insertionsort(const uint8_t *T, const saidx_t *PA,
 
 #if (SS_BLOCKSIZE == 0) || (SS_INSERTIONSORT_THRESHOLD < SS_BLOCKSIZE)
 
+template <typename saidx_t>
 static inline
 void
 ss_fixdown(const uint8_t *Td, const saidx_t *PA,
@@ -174,6 +240,7 @@ ss_fixdown(const uint8_t *Td, const saidx_t *PA,
 }
 
 /* Simple top-down heapsort. */
+template <typename saidx_t>
 static
 void
 ss_heapsort(const uint8_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
@@ -187,10 +254,10 @@ ss_heapsort(const uint8_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
   }
 
   for(i = m / 2 - 1; 0 <= i; --i) { ss_fixdown(Td, PA, SA, i, m); }
-  if((size % 2) == 0) { std::swap(SA[0], SA[m]); ss_fixdown(Td, PA, SA, 0, m); }
+  if((size % 2) == 0) { std::swap(SA[0], SA[m]); ss_fixdown(Td, PA, SA, (saidx_t)0, m); }
   for(i = m - 1; 0 < i; --i) {
     t = SA[0], SA[0] = SA[i];
-    ss_fixdown(Td, PA, SA, 0, i);
+    ss_fixdown(Td, PA, SA, (saidx_t)0, i);
     SA[i] = t;
   }
 }
@@ -199,6 +266,7 @@ ss_heapsort(const uint8_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
 /*---------------------------------------------------------------------------*/
 
 /* Returns the median of three elements. */
+template <typename saidx_t>
 static inline
 saidx_t *
 ss_median3(const uint8_t *Td, const saidx_t *PA,
@@ -213,6 +281,7 @@ ss_median3(const uint8_t *Td, const saidx_t *PA,
 }
 
 /* Returns the median of five elements. */
+template <typename saidx_t>
 static inline
 saidx_t *
 ss_median5(const uint8_t *Td, const saidx_t *PA,
@@ -228,6 +297,7 @@ ss_median5(const uint8_t *Td, const saidx_t *PA,
 }
 
 /* Returns the pivot element. */
+template <typename saidx_t>
 static inline
 saidx_t *
 ss_pivot(const uint8_t *Td, const saidx_t *PA, saidx_t *first, saidx_t *last) {
@@ -256,6 +326,7 @@ ss_pivot(const uint8_t *Td, const saidx_t *PA, saidx_t *first, saidx_t *last) {
 /*---------------------------------------------------------------------------*/
 
 /* Binary partition for substrings. */
+template <typename saidx_t>
 static inline
 saidx_t *
 ss_partition(const saidx_t *PA,
@@ -275,6 +346,7 @@ ss_partition(const saidx_t *PA,
 }
 
 /* Multikey introsort for medium size groups. */
+template <typename saidx_t>
 static
 void
 ss_mintrosort(const uint8_t *T, const saidx_t *PA,
@@ -300,7 +372,7 @@ ss_mintrosort(const uint8_t *T, const saidx_t *PA,
     }
 
     Td = T + depth;
-    if(limit-- == 0) { ss_heapsort(Td, PA, first, last - first); }
+    if(limit-- == 0) { ss_heapsort(Td, PA, first, (saidx_t)(last - first)); }
     if(limit < 0) {
       for(a = first + 1, v = Td[PA[*first]]; a < last; ++a) {
         if((x = Td[PA[*a]]) != v) {
@@ -417,6 +489,7 @@ ss_mintrosort(const uint8_t *T, const saidx_t *PA,
 
 #if SS_BLOCKSIZE != 0
 
+template <typename saidx_t>
 static inline
 void
 ss_blockswap(saidx_t *a, saidx_t *b, saidx_t n) {
@@ -426,6 +499,7 @@ ss_blockswap(saidx_t *a, saidx_t *b, saidx_t n) {
   }
 }
 
+template <typename saidx_t>
 static inline
 void
 ss_rotate(saidx_t *first, saidx_t *middle, saidx_t *last) {
@@ -467,6 +541,7 @@ ss_rotate(saidx_t *first, saidx_t *middle, saidx_t *last) {
 
 /*---------------------------------------------------------------------------*/
 
+template <typename saidx_t>
 static
 void
 ss_inplacemerge(const uint8_t *T, const saidx_t *PA,
@@ -510,6 +585,7 @@ ss_inplacemerge(const uint8_t *T, const saidx_t *PA,
 /*---------------------------------------------------------------------------*/
 
 /* Merge-forward with internal buffer. */
+template <typename saidx_t>
 static
 void
 ss_mergeforward(const uint8_t *T, const saidx_t *PA,
@@ -520,7 +596,7 @@ ss_mergeforward(const uint8_t *T, const saidx_t *PA,
   int32_t r;
 
   bufend = buf + (middle - first) - 1;
-  ss_blockswap(buf, first, middle - first);
+  ss_blockswap(buf, first, (saidx_t)(middle - first));
 
   for(t = *(a = first), b = buf, c = middle;;) {
     r = ss_compare(T, PA + *b, PA + *c, depth);
@@ -560,6 +636,7 @@ ss_mergeforward(const uint8_t *T, const saidx_t *PA,
 }
 
 /* Merge-backward with internal buffer. */
+template <typename saidx_t>
 static
 void
 ss_mergebackward(const uint8_t *T, const saidx_t *PA,
@@ -572,7 +649,7 @@ ss_mergebackward(const uint8_t *T, const saidx_t *PA,
   int32_t x;
 
   bufend = buf + (last - middle) - 1;
-  ss_blockswap(buf, middle, last - middle);
+  ss_blockswap(buf, middle, (saidx_t)(last - middle));
 
   x = 0;
   if(*bufend < 0)       { p1 = PA + ~*bufend; x |= 1; }
@@ -619,6 +696,7 @@ ss_mergebackward(const uint8_t *T, const saidx_t *PA,
 }
 
 /* D&C based merge. */
+template <typename saidx_t>
 static
 void
 ss_swapmerge(const uint8_t *T, const saidx_t *PA,
@@ -661,7 +739,7 @@ ss_swapmerge(const uint8_t *T, const saidx_t *PA,
       continue;
     }
 
-    for(m = 0, len = MIN(middle - first, last - middle), half = len >> 1;
+    for(m = 0, len = std::min(middle - first, last - middle), half = len >> 1;
         0 < len;
         len = half, half >>= 1) {
       if(ss_compare(T, PA + GETIDX(*(middle + m + half)),
@@ -713,6 +791,7 @@ ss_swapmerge(const uint8_t *T, const saidx_t *PA,
 /*- Function -*/
 
 /* Substring sort */
+template <typename saidx_t>
 void
 sssort(const uint8_t *T, const saidx_t *PA,
        saidx_t *first, saidx_t *last,
@@ -786,6 +865,7 @@ sssort(const uint8_t *T, const saidx_t *PA,
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <typename saidx_t>
 static inline
 int32_t
 tr_ilg(saidx_t n) {
@@ -820,6 +900,7 @@ tr_ilg(saidx_t n) {
 /*---------------------------------------------------------------------------*/
 
 /* Simple insertionsort for small size groups. */
+template <typename saidx_t>
 static
 void
 tr_insertionsort(const saidx_t *ISAd, saidx_t *first, saidx_t *last) {
@@ -839,6 +920,7 @@ tr_insertionsort(const saidx_t *ISAd, saidx_t *first, saidx_t *last) {
 
 /*---------------------------------------------------------------------------*/
 
+template <typename saidx_t>
 static inline
 void
 tr_fixdown(const saidx_t *ISAd, saidx_t *SA, saidx_t i, saidx_t size) {
@@ -855,6 +937,7 @@ tr_fixdown(const saidx_t *ISAd, saidx_t *SA, saidx_t i, saidx_t size) {
 }
 
 /* Simple top-down heapsort. */
+template <typename saidx_t>
 static
 void
 tr_heapsort(const saidx_t *ISAd, saidx_t *SA, saidx_t size) {
@@ -868,10 +951,10 @@ tr_heapsort(const saidx_t *ISAd, saidx_t *SA, saidx_t size) {
   }
 
   for(i = m / 2 - 1; 0 <= i; --i) { tr_fixdown(ISAd, SA, i, m); }
-  if((size % 2) == 0) { std::swap(SA[0], SA[m]); tr_fixdown(ISAd, SA, 0, m); }
+  if((size % 2) == 0) { std::swap(SA[0], SA[m]); tr_fixdown(ISAd, SA, (saidx_t)0, m); }
   for(i = m - 1; 0 < i; --i) {
     t = SA[0], SA[0] = SA[i];
-    tr_fixdown(ISAd, SA, 0, i);
+    tr_fixdown(ISAd, SA, (saidx_t)0, i);
     SA[i] = t;
   }
 }
@@ -880,6 +963,7 @@ tr_heapsort(const saidx_t *ISAd, saidx_t *SA, saidx_t size) {
 /*---------------------------------------------------------------------------*/
 
 /* Returns the median of three elements. */
+template <typename saidx_t>
 static inline
 saidx_t *
 tr_median3(const saidx_t *ISAd, saidx_t *v1, saidx_t *v2, saidx_t *v3) {
@@ -893,6 +977,7 @@ tr_median3(const saidx_t *ISAd, saidx_t *v1, saidx_t *v2, saidx_t *v3) {
 }
 
 /* Returns the median of five elements. */
+template <typename saidx_t>
 static inline
 saidx_t *
 tr_median5(const saidx_t *ISAd,
@@ -908,6 +993,7 @@ tr_median5(const saidx_t *ISAd,
 }
 
 /* Returns the pivot element. */
+template <typename saidx_t>
 static inline
 saidx_t *
 tr_pivot(const saidx_t *ISAd, saidx_t *first, saidx_t *last) {
@@ -935,7 +1021,7 @@ tr_pivot(const saidx_t *ISAd, saidx_t *first, saidx_t *last) {
 
 /*---------------------------------------------------------------------------*/
 
-typedef struct _trbudget_t trbudget_t;
+template <typename saidx_t>
 struct _trbudget_t {
   saidx_t chance;
   saidx_t remain;
@@ -943,16 +1029,22 @@ struct _trbudget_t {
   saidx_t count;
 };
 
+template <typename saidx_t>
+using trbudget_t = struct _trbudget_t<saidx_t>;
+// typedef struct _trbudget_t trbudget_t;
+
+template <typename saidx_t>
 static inline
 void
-trbudget_init(trbudget_t *budget, saidx_t chance, saidx_t incval) {
+trbudget_init(trbudget_t<saidx_t> *budget, saidx_t chance, saidx_t incval) {
   budget->chance = chance;
   budget->remain = budget->incval = incval;
 }
 
+template <typename saidx_t>
 static inline
 int32_t
-trbudget_check(trbudget_t *budget, saidx_t size) {
+trbudget_check(trbudget_t<saidx_t> *budget, saidx_t size) {
   if(size <= budget->remain) { budget->remain -= size; return 1; }
   if(budget->chance == 0) { budget->count += size; return 0; }
   budget->remain += budget->incval - size;
@@ -963,6 +1055,7 @@ trbudget_check(trbudget_t *budget, saidx_t size) {
 
 /*---------------------------------------------------------------------------*/
 
+template <typename saidx_t>
 static inline
 void
 tr_partition(const saidx_t *ISAd,
@@ -1005,6 +1098,7 @@ tr_partition(const saidx_t *ISAd,
   *pa = first, *pb = last;
 }
 
+template <typename saidx_t>
 static
 void
 tr_copy(saidx_t *ISA, const saidx_t *SA,
@@ -1030,6 +1124,7 @@ tr_copy(saidx_t *ISA, const saidx_t *SA,
   }
 }
 
+template <typename saidx_t>
 static
 void
 tr_partialcopy(saidx_t *ISA, const saidx_t *SA,
@@ -1068,11 +1163,12 @@ tr_partialcopy(saidx_t *ISA, const saidx_t *SA,
   }
 }
 
+template <typename saidx_t>
 static
 void
 tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
              saidx_t *SA, saidx_t *first, saidx_t *last,
-             trbudget_t *budget) {
+             trbudget_t<saidx_t> *budget) {
 #define STACK_SIZE TR_STACKSIZE
   struct { const saidx_t *a; saidx_t *b, *c; int32_t d, e; }stack[STACK_SIZE];
   saidx_t *a, *b, *c;
@@ -1087,7 +1183,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
     if(limit < 0) {
       if(limit == -1) {
         /* tandem repeat partition */
-        tr_partition(ISAd - incr, first, first, last, &a, &b, last - SA - 1);
+        tr_partition(ISAd - incr, first, first, last, &a, &b, (saidx_t)(last - SA - 1));
 
         /* update ranks */
         if(a < last) {
@@ -1126,10 +1222,10 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
         /* tandem repeat copy */
         a = stack[--ssize].b, b = stack[ssize].c;
         if(stack[ssize].d == 0) {
-          tr_copy(ISA, SA, first, a, b, last, ISAd - ISA);
+          tr_copy(ISA, SA, first, a, b, last, (saidx_t)(ISAd - ISA));
         } else {
           if(0 <= trlink) { stack[trlink].d = -1; }
-          tr_partialcopy(ISA, SA, first, a, b, last, ISAd - ISA);
+          tr_partialcopy(ISA, SA, first, a, b, last, (saidx_t)(ISAd - ISA));
         }
         STACK_POP5(ISAd, first, last, limit, trlink);
       } else {
@@ -1145,7 +1241,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
           if(++a < last) { for(b = first, v = a - SA - 1; b < a; ++b) { ISA[*b] = v; } }
 
           /* push */
-          if(trbudget_check(budget, a - first)) {
+          if(trbudget_check(budget, (saidx_t)(a - first))) {
             if((a - first) <= (last - a)) {
               STACK_PUSH5(ISAd, a, last, -3, trlink);
               ISAd += incr, last = a, limit = next;
@@ -1179,7 +1275,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
     }
 
     if(limit-- == 0) {
-      tr_heapsort(ISAd, first, last - first);
+      tr_heapsort(ISAd, first, (saidx_t)(last - first));
       for(a = last - 1; first < a; a = b) {
         for(x = ISAd[*a], b = a - 1; (first <= b) && (ISAd[*b] == x); --b) { *b = ~*b; }
       }
@@ -1202,7 +1298,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
       if(b < last) { for(c = a, v = b - SA - 1; c < b; ++c) { ISA[*c] = v; } }
 
       /* push */
-      if((1 < (b - a)) && (trbudget_check(budget, b - a))) {
+      if((1 < (b - a)) && (trbudget_check(budget, (saidx_t)(b - a)))) {
         if((a - first) <= (last - b)) {
           if((last - b) <= (b - a)) {
             if(1 < (a - first)) {
@@ -1279,7 +1375,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
         }
       }
     } else {
-      if(trbudget_check(budget, last - first)) {
+      if(trbudget_check(budget, (saidx_t)(last - first))) {
         limit = tr_ilg(last - first), ISAd += incr;
       } else {
         if(0 <= trlink) { stack[trlink].d = -1; }
@@ -1297,14 +1393,15 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
 /*- Function -*/
 
 /* Tandem repeat sort */
+template <typename saidx_t>
 void
 trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
   saidx_t *ISAd;
   saidx_t *first, *last;
-  trbudget_t budget;
+  trbudget_t<saidx_t> budget;
   saidx_t t, skip, unsorted;
 
-  trbudget_init(&budget, tr_ilg(n) * 2 / 3, n);
+  trbudget_init(&budget, (saidx_t)(tr_ilg(n) * 2 / 3), n);
 /*  trbudget_init(&budget, tr_ilg(n) * 3 / 4, n); */
   for(ISAd = ISA + depth; -n < *SA; ISAd += ISAd - ISA) {
     first = SA;
@@ -1341,6 +1438,7 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
 #define _DIVSUFSORT64_IMPL_H 1
 
 /* Sorts suffixes of type B*. */
+template <typename saidx_t>
 static
 saidx_t
 sort_typeBstar(const uint8_t *T, saidx_t *SA,
@@ -1434,7 +1532,7 @@ note:
         }
         if(l == 0) { break; }
         sssort(T, PAb, SA + k, SA + l,
-               curbuf, bufsize, 2, n, *(SA + k) == (m - 1));
+               curbuf, bufsize, (saidx_t)2, n, *(SA + k) == (m - 1));
       }
     }
 #else
@@ -1444,7 +1542,7 @@ note:
         i = BUCKET_BSTAR(c0, c1);
         if(1 < (j - i)) {
           sssort(T, PAb, SA + i, SA + j,
-                 buf, bufsize, 2, n, *(SA + i) == (m - 1));
+                 buf, bufsize, (saidx_t)2, n, *(SA + i) == (m - 1));
         }
       }
     }
@@ -1464,7 +1562,7 @@ note:
     }
 
     /* Construct the inverse suffix array of type B* suffixes using trsort. */
-    trsort(ISAb, SA, m, 1);
+    trsort(ISAb, SA, m, (saidx_t)1);
 
     /* Set the sorted order of tyoe B* suffixes. */
     for(i = n - 1, j = m, c0 = T[n - 1]; 0 <= i;) {
@@ -1498,6 +1596,7 @@ note:
 }
 
 /* Constructs the suffix array by using the sorted order of type B* suffixes. */
+template <typename saidx_t>
 static
 void
 construct_SA(const uint8_t *T, saidx_t *SA,
@@ -1562,6 +1661,7 @@ construct_SA(const uint8_t *T, saidx_t *SA,
 
 /* Constructs the burrows-wheeler transformed string directly
    by using the sorted order of type B* suffixes. */
+template <typename saidx_t>
 static
 saidx_t
 construct_BWT(const uint8_t *T, saidx_t *SA,
@@ -1636,6 +1736,7 @@ construct_BWT(const uint8_t *T, saidx_t *SA,
 
 /*- Function -*/
 
+template <typename saidx_t>
 int32_t
 divsufsort(const uint8_t *T, saidx_t *SA, saidx_t n) {
   saidx_t *bucket_A, *bucket_B;
@@ -1665,6 +1766,7 @@ divsufsort(const uint8_t *T, saidx_t *SA, saidx_t n) {
   return err;
 }
 
+// template <typename saidx_t>
 // saidx_t
 // divbwt(const uint8_t *T, uint8_t *U, saidx_t *A, saidx_t n) {
 //   saidx_t *B;
@@ -1707,6 +1809,7 @@ divsufsort_version(void) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <typename saidx_t>
 static
 int
 _compare(const uint8_t *T, saidx_t Tsize,
@@ -1722,6 +1825,7 @@ _compare(const uint8_t *T, saidx_t Tsize,
 
 /* Burrows-Wheeler transform. */
 // TODO: use?
+// template <typename saidx_t>
 // int32_t
 // bw_transform(const uint8_t *T, uint8_t *U, saidx_t *SA,
 //              saidx_t n, saidx_t *idx) {
@@ -1782,6 +1886,7 @@ _compare(const uint8_t *T, saidx_t Tsize,
 
 // TODO: use?
 /* Inverse Burrows-Wheeler transform. */
+// template <typename saidx_t>
 // int32_t
 // inverse_bw_transform(const uint8_t *T, uint8_t *U, saidx_t *A,
 //                      saidx_t n, saidx_t idx) {

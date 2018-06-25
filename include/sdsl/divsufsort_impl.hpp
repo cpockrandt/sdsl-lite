@@ -1,5 +1,5 @@
 
-static const saint_t lg_table[256]= {
+static const int32_t lg_table[256]= {
  -1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
   5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
   6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
@@ -13,7 +13,7 @@ static const saint_t lg_table[256]= {
 #if (SS_BLOCKSIZE == 0) || (SS_INSERTIONSORT_THRESHOLD < SS_BLOCKSIZE)
 
 static inline
-saint_t
+int32_t
 ss_ilg(saidx_t n) {
 #if SS_BLOCKSIZE == 0
 # if defined(BUILD_DIVSUFSORT64)
@@ -54,7 +54,7 @@ ss_ilg(saidx_t n) {
 
 #if SS_BLOCKSIZE != 0
 
-static const saint_t sqq_table[256] = {
+static const int32_t sqq_table[256] = {
   0,  16,  22,  27,  32,  35,  39,  42,  45,  48,  50,  53,  55,  57,  59,  61,
  64,  65,  67,  69,  71,  73,  75,  76,  78,  80,  81,  83,  84,  86,  87,  89,
  90,  91,  93,  94,  96,  97,  98,  99, 101, 102, 103, 104, 106, 107, 108, 109,
@@ -107,11 +107,11 @@ ss_isqrt(saidx_t x) {
 
 /* Compares two suffixes. */
 static inline
-saint_t
-ss_compare(const sauchar_t *T,
+int32_t
+ss_compare(const uint8_t *T,
            const saidx_t *p1, const saidx_t *p2,
            saidx_t depth) {
-  const sauchar_t *U1, *U2, *U1n, *U2n;
+  const uint8_t *U1, *U2, *U1n, *U2n;
 
   for(U1 = T + depth + *p1,
       U2 = T + depth + *p2,
@@ -134,11 +134,11 @@ ss_compare(const sauchar_t *T,
 /* Insertionsort for small size groups */
 static
 void
-ss_insertionsort(const sauchar_t *T, const saidx_t *PA,
+ss_insertionsort(const uint8_t *T, const saidx_t *PA,
                  saidx_t *first, saidx_t *last, saidx_t depth) {
   saidx_t *i, *j;
   saidx_t t;
-  saint_t r;
+  int32_t r;
 
   for(i = last - 2; first <= i; --i) {
     for(t = *i, j = i + 1; 0 < (r = ss_compare(T, PA + t, PA + *j, depth));) {
@@ -159,11 +159,11 @@ ss_insertionsort(const sauchar_t *T, const saidx_t *PA,
 
 static inline
 void
-ss_fixdown(const sauchar_t *Td, const saidx_t *PA,
+ss_fixdown(const uint8_t *Td, const saidx_t *PA,
            saidx_t *SA, saidx_t i, saidx_t size) {
   saidx_t j, k;
   saidx_t v;
-  saint_t c, d, e;
+  int32_t c, d, e;
 
   for(v = SA[i], c = Td[PA[v]]; (j = 2 * i + 1) < size; SA[i] = SA[k], i = k) {
     d = Td[PA[SA[k = j++]]];
@@ -176,18 +176,18 @@ ss_fixdown(const sauchar_t *Td, const saidx_t *PA,
 /* Simple top-down heapsort. */
 static
 void
-ss_heapsort(const sauchar_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
+ss_heapsort(const uint8_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
   saidx_t i, m;
   saidx_t t;
 
   m = size;
   if((size % 2) == 0) {
     m--;
-    if(Td[PA[SA[m / 2]]] < Td[PA[SA[m]]]) { SWAP(SA[m], SA[m / 2]); }
+    if(Td[PA[SA[m / 2]]] < Td[PA[SA[m]]]) { std::swap(SA[m], SA[m / 2]); }
   }
 
   for(i = m / 2 - 1; 0 <= i; --i) { ss_fixdown(Td, PA, SA, i, m); }
-  if((size % 2) == 0) { SWAP(SA[0], SA[m]); ss_fixdown(Td, PA, SA, 0, m); }
+  if((size % 2) == 0) { std::swap(SA[0], SA[m]); ss_fixdown(Td, PA, SA, 0, m); }
   for(i = m - 1; 0 < i; --i) {
     t = SA[0], SA[0] = SA[i];
     ss_fixdown(Td, PA, SA, 0, i);
@@ -201,10 +201,10 @@ ss_heapsort(const sauchar_t *Td, const saidx_t *PA, saidx_t *SA, saidx_t size) {
 /* Returns the median of three elements. */
 static inline
 saidx_t *
-ss_median3(const sauchar_t *Td, const saidx_t *PA,
+ss_median3(const uint8_t *Td, const saidx_t *PA,
            saidx_t *v1, saidx_t *v2, saidx_t *v3) {
   saidx_t *t;
-  if(Td[PA[*v1]] > Td[PA[*v2]]) { SWAP(v1, v2); }
+  if(Td[PA[*v1]] > Td[PA[*v2]]) { std::swap(v1, v2); }
   if(Td[PA[*v2]] > Td[PA[*v3]]) {
     if(Td[PA[*v1]] > Td[PA[*v3]]) { return v1; }
     else { return v3; }
@@ -215,14 +215,14 @@ ss_median3(const sauchar_t *Td, const saidx_t *PA,
 /* Returns the median of five elements. */
 static inline
 saidx_t *
-ss_median5(const sauchar_t *Td, const saidx_t *PA,
+ss_median5(const uint8_t *Td, const saidx_t *PA,
            saidx_t *v1, saidx_t *v2, saidx_t *v3, saidx_t *v4, saidx_t *v5) {
   saidx_t *t;
-  if(Td[PA[*v2]] > Td[PA[*v3]]) { SWAP(v2, v3); }
-  if(Td[PA[*v4]] > Td[PA[*v5]]) { SWAP(v4, v5); }
-  if(Td[PA[*v2]] > Td[PA[*v4]]) { SWAP(v2, v4); SWAP(v3, v5); }
-  if(Td[PA[*v1]] > Td[PA[*v3]]) { SWAP(v1, v3); }
-  if(Td[PA[*v1]] > Td[PA[*v4]]) { SWAP(v1, v4); SWAP(v3, v5); }
+  if(Td[PA[*v2]] > Td[PA[*v3]]) { std::swap(v2, v3); }
+  if(Td[PA[*v4]] > Td[PA[*v5]]) { std::swap(v4, v5); }
+  if(Td[PA[*v2]] > Td[PA[*v4]]) { std::swap(v2, v4); std::swap(v3, v5); }
+  if(Td[PA[*v1]] > Td[PA[*v3]]) { std::swap(v1, v3); }
+  if(Td[PA[*v1]] > Td[PA[*v4]]) { std::swap(v1, v4); std::swap(v3, v5); }
   if(Td[PA[*v3]] > Td[PA[*v4]]) { return v4; }
   return v3;
 }
@@ -230,7 +230,7 @@ ss_median5(const sauchar_t *Td, const saidx_t *PA,
 /* Returns the pivot element. */
 static inline
 saidx_t *
-ss_pivot(const sauchar_t *Td, const saidx_t *PA, saidx_t *first, saidx_t *last) {
+ss_pivot(const uint8_t *Td, const saidx_t *PA, saidx_t *first, saidx_t *last) {
   saidx_t *middle;
   saidx_t t;
 
@@ -277,17 +277,17 @@ ss_partition(const saidx_t *PA,
 /* Multikey introsort for medium size groups. */
 static
 void
-ss_mintrosort(const sauchar_t *T, const saidx_t *PA,
+ss_mintrosort(const uint8_t *T, const saidx_t *PA,
               saidx_t *first, saidx_t *last,
               saidx_t depth) {
 #define STACK_SIZE SS_MISORT_STACKSIZE
-  struct { saidx_t *a, *b, c; saint_t d; } stack[STACK_SIZE];
-  const sauchar_t *Td;
+  struct { saidx_t *a, *b, c; int32_t d; } stack[STACK_SIZE];
+  const uint8_t *Td;
   saidx_t *a, *b, *c, *d, *e, *f;
   saidx_t s, t;
-  saint_t ssize;
-  saint_t limit;
-  saint_t v, x = 0;
+  int32_t ssize;
+  int32_t limit;
+  int32_t v, x = 0;
 
   for(ssize = 0, limit = ss_ilg(last - first);;) {
 
@@ -333,28 +333,28 @@ ss_mintrosort(const sauchar_t *T, const saidx_t *PA,
     /* choose pivot */
     a = ss_pivot(Td, PA, first, last);
     v = Td[PA[*a]];
-    SWAP(*first, *a);
+    std::swap(*first, *a);
 
     /* partition */
     for(b = first; (++b < last) && ((x = Td[PA[*b]]) == v);) { }
     if(((a = b) < last) && (x < v)) {
       for(; (++b < last) && ((x = Td[PA[*b]]) <= v);) {
-        if(x == v) { SWAP(*b, *a); ++a; }
+        if(x == v) { std::swap(*b, *a); ++a; }
       }
     }
     for(c = last; (b < --c) && ((x = Td[PA[*c]]) == v);) { }
     if((b < (d = c)) && (x > v)) {
       for(; (b < --c) && ((x = Td[PA[*c]]) >= v);) {
-        if(x == v) { SWAP(*c, *d); --d; }
+        if(x == v) { std::swap(*c, *d); --d; }
       }
     }
     for(; b < c;) {
-      SWAP(*b, *c);
+      std::swap(*b, *c);
       for(; (++b < c) && ((x = Td[PA[*b]]) <= v);) {
-        if(x == v) { SWAP(*b, *a); ++a; }
+        if(x == v) { std::swap(*b, *a); ++a; }
       }
       for(; (b < --c) && ((x = Td[PA[*c]]) >= v);) {
-        if(x == v) { SWAP(*c, *d); --d; }
+        if(x == v) { std::swap(*c, *d); --d; }
       }
     }
 
@@ -362,9 +362,9 @@ ss_mintrosort(const sauchar_t *T, const saidx_t *PA,
       c = b - 1;
 
       if((s = a - first) > (t = b - a)) { s = t; }
-      for(e = first, f = b - s; 0 < s; --s, ++e, ++f) { SWAP(*e, *f); }
+      for(e = first, f = b - s; 0 < s; --s, ++e, ++f) { std::swap(*e, *f); }
       if((s = d - c) > (t = last - d - 1)) { s = t; }
-      for(e = b, f = last - s; 0 < s; --s, ++e, ++f) { SWAP(*e, *f); }
+      for(e = b, f = last - s; 0 < s; --s, ++e, ++f) { std::swap(*e, *f); }
 
       a = first + (b - a), c = last - (d - c);
       b = (v <= Td[PA[*a] - 1]) ? a : ss_partition(PA, a, c, depth);
@@ -469,14 +469,14 @@ ss_rotate(saidx_t *first, saidx_t *middle, saidx_t *last) {
 
 static
 void
-ss_inplacemerge(const sauchar_t *T, const saidx_t *PA,
+ss_inplacemerge(const uint8_t *T, const saidx_t *PA,
                 saidx_t *first, saidx_t *middle, saidx_t *last,
                 saidx_t depth) {
   const saidx_t *p;
   saidx_t *a, *b;
   saidx_t len, half;
-  saint_t q, r;
-  saint_t x;
+  int32_t q, r;
+  int32_t x;
 
   for(;;) {
     if(*(last - 1) < 0) { x = 1; p = PA + ~*(last - 1); }
@@ -512,12 +512,12 @@ ss_inplacemerge(const sauchar_t *T, const saidx_t *PA,
 /* Merge-forward with internal buffer. */
 static
 void
-ss_mergeforward(const sauchar_t *T, const saidx_t *PA,
+ss_mergeforward(const uint8_t *T, const saidx_t *PA,
                 saidx_t *first, saidx_t *middle, saidx_t *last,
                 saidx_t *buf, saidx_t depth) {
   saidx_t *a, *b, *c, *bufend;
   saidx_t t;
-  saint_t r;
+  int32_t r;
 
   bufend = buf + (middle - first) - 1;
   ss_blockswap(buf, first, middle - first);
@@ -562,14 +562,14 @@ ss_mergeforward(const sauchar_t *T, const saidx_t *PA,
 /* Merge-backward with internal buffer. */
 static
 void
-ss_mergebackward(const sauchar_t *T, const saidx_t *PA,
+ss_mergebackward(const uint8_t *T, const saidx_t *PA,
                  saidx_t *first, saidx_t *middle, saidx_t *last,
                  saidx_t *buf, saidx_t depth) {
   const saidx_t *p1, *p2;
   saidx_t *a, *b, *c, *bufend;
   saidx_t t;
-  saint_t r;
-  saint_t x;
+  int32_t r;
+  int32_t x;
 
   bufend = buf + (last - middle) - 1;
   ss_blockswap(buf, middle, last - middle);
@@ -621,7 +621,7 @@ ss_mergebackward(const sauchar_t *T, const saidx_t *PA,
 /* D&C based merge. */
 static
 void
-ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
+ss_swapmerge(const uint8_t *T, const saidx_t *PA,
              saidx_t *first, saidx_t *middle, saidx_t *last,
              saidx_t *buf, saidx_t bufsize, saidx_t depth) {
 #define STACK_SIZE SS_SMERGE_STACKSIZE
@@ -636,11 +636,11 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
       *(b) = ~*(b);\
     }\
   } while(0)
-  struct { saidx_t *a, *b, *c; saint_t d; } stack[STACK_SIZE];
+  struct { saidx_t *a, *b, *c; int32_t d; } stack[STACK_SIZE];
   saidx_t *l, *r, *lm, *rm;
   saidx_t m, len, half;
-  saint_t ssize;
-  saint_t check, next;
+  int32_t ssize;
+  int32_t check, next;
 
   for(check = 0, ssize = 0;;) {
     if((last - middle) <= bufsize) {
@@ -714,10 +714,10 @@ ss_swapmerge(const sauchar_t *T, const saidx_t *PA,
 
 /* Substring sort */
 void
-sssort(const sauchar_t *T, const saidx_t *PA,
+sssort(const uint8_t *T, const saidx_t *PA,
        saidx_t *first, saidx_t *last,
        saidx_t *buf, saidx_t bufsize,
-       saidx_t depth, saidx_t n, saint_t lastsuffix) {
+       saidx_t depth, saidx_t n, int32_t lastsuffix) {
   saidx_t *a;
 #if SS_BLOCKSIZE != 0
   saidx_t *b, *middle, *curbuf;
@@ -787,7 +787,7 @@ sssort(const sauchar_t *T, const saidx_t *PA,
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline
-saint_t
+int32_t
 tr_ilg(saidx_t n) {
 #if defined(BUILD_DIVSUFSORT64)
   return (n >> 32) ?
@@ -864,11 +864,11 @@ tr_heapsort(const saidx_t *ISAd, saidx_t *SA, saidx_t size) {
   m = size;
   if((size % 2) == 0) {
     m--;
-    if(ISAd[SA[m / 2]] < ISAd[SA[m]]) { SWAP(SA[m], SA[m / 2]); }
+    if(ISAd[SA[m / 2]] < ISAd[SA[m]]) { std::swap(SA[m], SA[m / 2]); }
   }
 
   for(i = m / 2 - 1; 0 <= i; --i) { tr_fixdown(ISAd, SA, i, m); }
-  if((size % 2) == 0) { SWAP(SA[0], SA[m]); tr_fixdown(ISAd, SA, 0, m); }
+  if((size % 2) == 0) { std::swap(SA[0], SA[m]); tr_fixdown(ISAd, SA, 0, m); }
   for(i = m - 1; 0 < i; --i) {
     t = SA[0], SA[0] = SA[i];
     tr_fixdown(ISAd, SA, 0, i);
@@ -884,7 +884,7 @@ static inline
 saidx_t *
 tr_median3(const saidx_t *ISAd, saidx_t *v1, saidx_t *v2, saidx_t *v3) {
   saidx_t *t;
-  if(ISAd[*v1] > ISAd[*v2]) { SWAP(v1, v2); }
+  if(ISAd[*v1] > ISAd[*v2]) { std::swap(v1, v2); }
   if(ISAd[*v2] > ISAd[*v3]) {
     if(ISAd[*v1] > ISAd[*v3]) { return v1; }
     else { return v3; }
@@ -898,11 +898,11 @@ saidx_t *
 tr_median5(const saidx_t *ISAd,
            saidx_t *v1, saidx_t *v2, saidx_t *v3, saidx_t *v4, saidx_t *v5) {
   saidx_t *t;
-  if(ISAd[*v2] > ISAd[*v3]) { SWAP(v2, v3); }
-  if(ISAd[*v4] > ISAd[*v5]) { SWAP(v4, v5); }
-  if(ISAd[*v2] > ISAd[*v4]) { SWAP(v2, v4); SWAP(v3, v5); }
-  if(ISAd[*v1] > ISAd[*v3]) { SWAP(v1, v3); }
-  if(ISAd[*v1] > ISAd[*v4]) { SWAP(v1, v4); SWAP(v3, v5); }
+  if(ISAd[*v2] > ISAd[*v3]) { std::swap(v2, v3); }
+  if(ISAd[*v4] > ISAd[*v5]) { std::swap(v4, v5); }
+  if(ISAd[*v2] > ISAd[*v4]) { std::swap(v2, v4); std::swap(v3, v5); }
+  if(ISAd[*v1] > ISAd[*v3]) { std::swap(v1, v3); }
+  if(ISAd[*v1] > ISAd[*v4]) { std::swap(v1, v4); std::swap(v3, v5); }
   if(ISAd[*v3] > ISAd[*v4]) { return v4; }
   return v3;
 }
@@ -951,7 +951,7 @@ trbudget_init(trbudget_t *budget, saidx_t chance, saidx_t incval) {
 }
 
 static inline
-saint_t
+int32_t
 trbudget_check(trbudget_t *budget, saidx_t size) {
   if(size <= budget->remain) { budget->remain -= size; return 1; }
   if(budget->chance == 0) { budget->count += size; return 0; }
@@ -975,31 +975,31 @@ tr_partition(const saidx_t *ISAd,
   for(b = middle - 1; (++b < last) && ((x = ISAd[*b]) == v);) { }
   if(((a = b) < last) && (x < v)) {
     for(; (++b < last) && ((x = ISAd[*b]) <= v);) {
-      if(x == v) { SWAP(*b, *a); ++a; }
+      if(x == v) { std::swap(*b, *a); ++a; }
     }
   }
   for(c = last; (b < --c) && ((x = ISAd[*c]) == v);) { }
   if((b < (d = c)) && (x > v)) {
     for(; (b < --c) && ((x = ISAd[*c]) >= v);) {
-      if(x == v) { SWAP(*c, *d); --d; }
+      if(x == v) { std::swap(*c, *d); --d; }
     }
   }
   for(; b < c;) {
-    SWAP(*b, *c);
+    std::swap(*b, *c);
     for(; (++b < c) && ((x = ISAd[*b]) <= v);) {
-      if(x == v) { SWAP(*b, *a); ++a; }
+      if(x == v) { std::swap(*b, *a); ++a; }
     }
     for(; (b < --c) && ((x = ISAd[*c]) >= v);) {
-      if(x == v) { SWAP(*c, *d); --d; }
+      if(x == v) { std::swap(*c, *d); --d; }
     }
   }
 
   if(a <= d) {
     c = b - 1;
     if((s = a - first) > (t = b - a)) { s = t; }
-    for(e = first, f = b - s; 0 < s; --s, ++e, ++f) { SWAP(*e, *f); }
+    for(e = first, f = b - s; 0 < s; --s, ++e, ++f) { std::swap(*e, *f); }
     if((s = d - c) > (t = last - d - 1)) { s = t; }
-    for(e = b, f = last - s; 0 < s; --s, ++e, ++f) { SWAP(*e, *f); }
+    for(e = b, f = last - s; 0 < s; --s, ++e, ++f) { std::swap(*e, *f); }
     first += (b - a), last -= (d - c);
   }
   *pa = first, *pb = last;
@@ -1074,13 +1074,13 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
              saidx_t *SA, saidx_t *first, saidx_t *last,
              trbudget_t *budget) {
 #define STACK_SIZE TR_STACKSIZE
-  struct { const saidx_t *a; saidx_t *b, *c; saint_t d, e; }stack[STACK_SIZE];
+  struct { const saidx_t *a; saidx_t *b, *c; int32_t d, e; }stack[STACK_SIZE];
   saidx_t *a, *b, *c;
   saidx_t t;
   saidx_t v, x = 0;
   saidx_t incr = ISAd - ISA;
-  saint_t limit, next;
-  saint_t ssize, trlink = -1;
+  int32_t limit, next;
+  int32_t ssize, trlink = -1;
 
   for(ssize = 0, limit = tr_ilg(last - first);;) {
 
@@ -1189,7 +1189,7 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
 
     /* choose pivot */
     a = tr_pivot(ISAd, first, last);
-    SWAP(*first, *a);
+    std::swap(*first, *a);
     v = ISAd[*first];
 
     /* partition */
@@ -1343,7 +1343,7 @@ trsort(saidx_t *ISA, saidx_t *SA, saidx_t n, saidx_t depth) {
 /* Sorts suffixes of type B*. */
 static
 saidx_t
-sort_typeBstar(const sauchar_t *T, saidx_t *SA,
+sort_typeBstar(const uint8_t *T, saidx_t *SA,
                saidx_t *bucket_A, saidx_t *bucket_B,
                saidx_t n) {
   saidx_t *PAb, *ISAb, *buf;
@@ -1352,9 +1352,9 @@ sort_typeBstar(const sauchar_t *T, saidx_t *SA,
   saidx_t l;
 #endif
   saidx_t i, j, k, t, m, bufsize;
-  saint_t c0, c1;
+  int32_t c0, c1;
 #ifdef _OPENMP
-  saint_t d0, d1;
+  int32_t d0, d1;
   int tmp;
 #endif
 
@@ -1500,12 +1500,12 @@ note:
 /* Constructs the suffix array by using the sorted order of type B* suffixes. */
 static
 void
-construct_SA(const sauchar_t *T, saidx_t *SA,
+construct_SA(const uint8_t *T, saidx_t *SA,
              saidx_t *bucket_A, saidx_t *bucket_B,
              saidx_t n, saidx_t m) {
   saidx_t *i, *j, *k;
   saidx_t s;
-  saint_t c0, c1, c2;
+  int32_t c0, c1, c2;
 
   if(0 < m) {
     /* Construct the sorted order of type B suffixes by using
@@ -1564,12 +1564,12 @@ construct_SA(const sauchar_t *T, saidx_t *SA,
    by using the sorted order of type B* suffixes. */
 static
 saidx_t
-construct_BWT(const sauchar_t *T, saidx_t *SA,
+construct_BWT(const uint8_t *T, saidx_t *SA,
               saidx_t *bucket_A, saidx_t *bucket_B,
               saidx_t n, saidx_t m) {
   saidx_t *i, *j, *k, *orig;
   saidx_t s;
-  saint_t c0, c1, c2;
+  int32_t c0, c1, c2;
 
   if(0 < m) {
     /* Construct the sorted order of type B suffixes by using
@@ -1636,11 +1636,11 @@ construct_BWT(const sauchar_t *T, saidx_t *SA,
 
 /*- Function -*/
 
-saint_t
-divsufsort(const sauchar_t *T, saidx_t *SA, saidx_t n) {
+int32_t
+divsufsort(const uint8_t *T, saidx_t *SA, saidx_t n) {
   saidx_t *bucket_A, *bucket_B;
   saidx_t m;
-  saint_t err = 0;
+  int32_t err = 0;
 
   /* Check arguments. */
   if((T == NULL) || (SA == NULL) || (n < 0)) { return -1; }
@@ -1665,40 +1665,40 @@ divsufsort(const sauchar_t *T, saidx_t *SA, saidx_t n) {
   return err;
 }
 
-saidx_t
-divbwt(const sauchar_t *T, sauchar_t *U, saidx_t *A, saidx_t n) {
-  saidx_t *B;
-  saidx_t *bucket_A, *bucket_B;
-  saidx_t m, pidx, i;
-
-  /* Check arguments. */
-  if((T == NULL) || (U == NULL) || (n < 0)) { return -1; }
-  else if(n <= 1) { if(n == 1) { U[0] = T[0]; } return n; }
-
-  if((B = A) == NULL) { B = (saidx_t *)malloc((size_t)(n + 1) * sizeof(saidx_t)); }
-  bucket_A = (saidx_t *)malloc(BUCKET_A_SIZE * sizeof(saidx_t));
-  bucket_B = (saidx_t *)malloc(BUCKET_B_SIZE * sizeof(saidx_t));
-
-  /* Burrows-Wheeler Transform. */
-  if((B != NULL) && (bucket_A != NULL) && (bucket_B != NULL)) {
-    m = sort_typeBstar(T, B, bucket_A, bucket_B, n);
-    pidx = construct_BWT(T, B, bucket_A, bucket_B, n, m);
-
-    /* Copy to output string. */
-    U[0] = T[n - 1];
-    for(i = 0; i < pidx; ++i) { U[i + 1] = (sauchar_t)B[i]; }
-    for(i += 1; i < n; ++i) { U[i] = (sauchar_t)B[i]; }
-    pidx += 1;
-  } else {
-    pidx = -2;
-  }
-
-  free(bucket_B);
-  free(bucket_A);
-  if(A == NULL) { free(B); }
-
-  return pidx;
-}
+// saidx_t
+// divbwt(const uint8_t *T, uint8_t *U, saidx_t *A, saidx_t n) {
+//   saidx_t *B;
+//   saidx_t *bucket_A, *bucket_B;
+//   saidx_t m, pidx, i;
+//
+//   /* Check arguments. */
+//   if((T == NULL) || (U == NULL) || (n < 0)) { return -1; }
+//   else if(n <= 1) { if(n == 1) { U[0] = T[0]; } return n; }
+//
+//   if((B = A) == NULL) { B = (saidx_t *)malloc((size_t)(n + 1) * sizeof(saidx_t)); }
+//   bucket_A = (saidx_t *)malloc(BUCKET_A_SIZE * sizeof(saidx_t));
+//   bucket_B = (saidx_t *)malloc(BUCKET_B_SIZE * sizeof(saidx_t));
+//
+//   /* Burrows-Wheeler Transform. */
+//   if((B != NULL) && (bucket_A != NULL) && (bucket_B != NULL)) {
+//     m = sort_typeBstar(T, B, bucket_A, bucket_B, n);
+//     pidx = construct_BWT(T, B, bucket_A, bucket_B, n, m);
+//
+//     /* Copy to output string. */
+//     U[0] = T[n - 1];
+//     for(i = 0; i < pidx; ++i) { U[i + 1] = (uint8_t)B[i]; }
+//     for(i += 1; i < n; ++i) { U[i] = (uint8_t)B[i]; }
+//     pidx += 1;
+//   } else {
+//     pidx = -2;
+//   }
+//
+//   free(bucket_B);
+//   free(bucket_A);
+//   if(A == NULL) { free(B); }
+//
+//   return pidx;
+// }
 
 const char *
 divsufsort_version(void) {
@@ -1709,11 +1709,11 @@ divsufsort_version(void) {
 
 static
 int
-_compare(const sauchar_t *T, saidx_t Tsize,
-         const sauchar_t *P, saidx_t Psize,
+_compare(const uint8_t *T, saidx_t Tsize,
+         const uint8_t *P, saidx_t Psize,
          saidx_t suf, saidx_t *match) {
   saidx_t i, j;
-  saint_t r;
+  int32_t r;
   for(i = suf + *match, j = *match, r = 0;
       (i < Tsize) && (j < Psize) && ((r = T[i] - P[j]) == 0); ++i, ++j) { }
   *match = j;
@@ -1722,11 +1722,11 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 
 /* Burrows-Wheeler transform. */
 // TODO: use?
-// saint_t
-// bw_transform(const sauchar_t *T, sauchar_t *U, saidx_t *SA,
+// int32_t
+// bw_transform(const uint8_t *T, uint8_t *U, saidx_t *SA,
 //              saidx_t n, saidx_t *idx) {
 //   saidx_t *A, i, j, p, t;
-//   saint_t c;
+//   int32_t c;
 //
 //   /* Check arguments. */
 //   if((T == NULL) || (U == NULL) || (n < 0) || (idx == NULL)) { return -1; }
@@ -1739,7 +1739,7 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 //   if((A = SA) == NULL) {
 //     i = divbwt(T, U, NULL, n);
 //     if(0 <= i) { *idx = i; i = 0; }
-//     return (saint_t)i;
+//     return (int32_t)i;
 //   }
 //
 //   /* BW transform. */
@@ -1750,7 +1750,7 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 //       t = A[i];
 //       if(0 <= p) {
 //         c = T[j];
-//         U[j] = (j <= p) ? T[p] : (sauchar_t)A[p];
+//         U[j] = (j <= p) ? T[p] : (uint8_t)A[p];
 //         A[j] = c;
 //         j++;
 //       } else {
@@ -1760,7 +1760,7 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 //     p = t - 1;
 //     if(0 <= p) {
 //       c = T[j];
-//       U[j] = (j <= p) ? T[p] : (sauchar_t)A[p];
+//       U[j] = (j <= p) ? T[p] : (uint8_t)A[p];
 //       A[j] = c;
 //     } else {
 //       *idx = i;
@@ -1782,14 +1782,14 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 
 // TODO: use?
 /* Inverse Burrows-Wheeler transform. */
-// saint_t
-// inverse_bw_transform(const sauchar_t *T, sauchar_t *U, saidx_t *A,
+// int32_t
+// inverse_bw_transform(const uint8_t *T, uint8_t *U, saidx_t *A,
 //                      saidx_t n, saidx_t idx) {
 //   saidx_t C[ALPHABET_SIZE];
-//   sauchar_t D[ALPHABET_SIZE];
+//   uint8_t D[ALPHABET_SIZE];
 //   saidx_t *B;
 //   saidx_t i, p;
-//   saint_t c, d;
+//   int32_t c, d;
 //
 //   /* Check arguments. */
 //   if((T == NULL) || (U == NULL) || (n < 0) || (idx < 0) ||
@@ -1810,7 +1810,7 @@ _compare(const sauchar_t *T, saidx_t Tsize,
 //     p = C[c];
 //     if(0 < p) {
 //       C[c] = i;
-//       D[d++] = (sauchar_t)c;
+//       D[d++] = (uint8_t)c;
 //       i += p;
 //     }
 //   }

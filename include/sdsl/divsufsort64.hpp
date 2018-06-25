@@ -1,5 +1,3 @@
-// #define BUILD_DIVSUFSORT64
-
 #include <sdsl/divsufsort_config.hpp>
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7,71 +5,22 @@
 #ifndef _DIVSUFSORT64_H
 #define _DIVSUFSORT64_H 1
 
-#include <inttypes.h>
-
-/*- Datatypes -*/
-#ifndef SAUCHAR_T
-#define SAUCHAR_T
-typedef uint8_t sauchar_t;
-#endif /* SAUCHAR_T */
-#ifndef SAINT_T
-#define SAINT_T
-typedef int32_t saint_t;
-#endif /* SAINT_T */
 #ifndef SAIDX64_T
 #define SAIDX64_T
 typedef int64_t saidx64_t;
-#endif /* SAIDX64_T */
-#ifndef PRIdSAINT_T
-#define PRIdSAINT_T PRId32
-#endif /* PRIdSAINT_T */
+#endif
+
 #ifndef PRIdSAIDX64_T
 #define PRIdSAIDX64_T PRId64
-#endif /* PRIdSAIDX64_T */
+#endif
 
 #endif /* _DIVSUFSORT64_H */
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #ifndef _DIVSUFSORT_PRIVATE_H
-// #define _DIVSUFSORT_PRIVATE_H 1
-
-// #if HAVE_CONFIG_H
-// # include "config.h"
-// #endif
-#include <assert.h>
-#include <stdio.h>
-#if HAVE_STRING_H
-# include <string.h>
-#endif
-#if HAVE_STDLIB_H
-# include <stdlib.h>
-#endif
-#if HAVE_MEMORY_H
-# include <memory.h>
-#endif
-#if HAVE_STDDEF_H
-# include <stddef.h>
-#endif
-#if HAVE_STRINGS_H
-# include <strings.h>
-#endif
-#if HAVE_INTTYPES_H
-# include <inttypes.h>
-#else
-# if HAVE_STDINT_H
-#  include <stdint.h>
-# endif
-#endif
 // #if defined(BUILD_DIVSUFSORT64)
-// # include "divsufsort64.h"
-# ifndef SAIDX_T
-#  define SAIDX_T
-#  define saidx_t saidx64_t
-# endif /* SAIDX_T */
-# ifndef PRIdSAIDX_T
-#  define PRIdSAIDX_T PRIdSAIDX64_T
-# endif /* PRIdSAIDX_T */
+#define saidx_t saidx64_t
+#define PRIdSAIDX_T PRIdSAIDX64_T
 // # define divsufsort divsufsort64
 // # define divbwt divbwt64
 // # define divsufsort_version divsufsort64_version
@@ -86,8 +35,6 @@ typedef int64_t saidx64_t;
 // # include "divsufsort.h"
 // #endif
 
-
-/*- Constants -*/
 #if !defined(UINT8_MAX)
 # define UINT8_MAX (255)
 #endif /* UINT8_MAX */
@@ -145,8 +92,6 @@ typedef int64_t saidx64_t;
 // # define TR_STACKSIZE (64)
 // #endif
 
-
-/*- Macros -*/
 #ifndef SWAP
 # define SWAP(_a, _b) do { t = (_a); (_a) = (_b); (_b) = t; } while(0)
 #endif /* SWAP */
@@ -191,8 +136,6 @@ typedef int64_t saidx64_t;
 #define BUCKET_B(_c0, _c1) (bucket_B[(_c1) * ALPHABET_SIZE + (_c0)])
 #define BUCKET_BSTAR(_c0, _c1) (bucket_B[(_c0) * ALPHABET_SIZE + (_c1)])
 #endif
-
-// #endif /* _DIVSUFSORT_PRIVATE_H */
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

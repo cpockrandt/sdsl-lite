@@ -26,13 +26,11 @@
 
  #define STACK_PUSH(_a, _b, _c, _d)\
   do {\
-    assert(ssize < STACK_SIZE);\
     stack[ssize].a = (_a), stack[ssize].b = (_b),\
     stack[ssize].c = (_c), stack[ssize++].d = (_d);\
   } while(0)
 #define STACK_PUSH5(_a, _b, _c, _d, _e)\
   do {\
-    assert(ssize < STACK_SIZE);\
     stack[ssize].a = (_a), stack[ssize].b = (_b),\
     stack[ssize].c = (_c), stack[ssize].d = (_d), stack[ssize++].e = (_e);\
   } while(0)
@@ -50,7 +48,30 @@
     (_a) = stack[--ssize].a, (_b) = stack[ssize].b,\
     (_c) = stack[ssize].c, (_d) = stack[ssize].d, (_e) = stack[ssize].e;\
   } while(0)
-/* for divsufsort.c */
+
+ #define PROJECT_VERSION_FULL "2.0.1-15-g22e6b23"
+
+ #include <assert.h>
+ #include <stdio.h>
+ #include <inttypes.h> // alternative: #include <stdint.h>
+
+ // #include <stdlib.h>
+ // #include <memory.h>
+ // #include <stddef.h>
+ // #include <strings.h>
+
+ #if !defined(UINT8_MAX)
+ # define UINT8_MAX (255)
+ #endif
+
+ #define ALPHABET_SIZE (256)
+ #define BUCKET_A_SIZE (ALPHABET_SIZE)
+ #define BUCKET_B_SIZE (ALPHABET_SIZE * ALPHABET_SIZE)
+ #define SS_INSERTIONSORT_THRESHOLD (8)
+ #define SS_BLOCKSIZE (1024)
+ #define SS_MISORT_STACKSIZE (16)
+ #define TR_INSERTIONSORT_THRESHOLD (8)
+
 #define BUCKET_A(_c0) bucket_A[(_c0)]
 #if ALPHABET_SIZE == 256
 #define BUCKET_B(_c0, _c1) (bucket_B[((_c1) << 8) | (_c0)])

@@ -24,6 +24,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef INCLUDED_SDSL_DIVSUFSORT
+#define INCLUDED_SDSL_DIVSUFSORT
+
+namespace sdsl {
+
 #define PROJECT_VERSION_FULL "2.0.1-15-g22e6b23"
 
 #include <assert.h>
@@ -313,7 +318,6 @@ static inline
 saidx_t *
 ss_median3(const uint8_t *Td, const saidx_t *PA,
            saidx_t *v1, saidx_t *v2, saidx_t *v3) {
-  saidx_t *t;
   if(Td[PA[*v1]] > Td[PA[*v2]]) { std::swap(v1, v2); }
   if(Td[PA[*v2]] > Td[PA[*v3]]) {
     if(Td[PA[*v1]] > Td[PA[*v3]]) { return v1; }
@@ -328,7 +332,6 @@ static inline
 saidx_t *
 ss_median5(const uint8_t *Td, const saidx_t *PA,
            saidx_t *v1, saidx_t *v2, saidx_t *v3, saidx_t *v4, saidx_t *v5) {
-  saidx_t *t;
   if(Td[PA[*v2]] > Td[PA[*v3]]) { std::swap(v2, v3); }
   if(Td[PA[*v4]] > Td[PA[*v5]]) { std::swap(v4, v5); }
   if(Td[PA[*v2]] > Td[PA[*v4]]) { std::swap(v2, v4); std::swap(v3, v5); }
@@ -1005,7 +1008,6 @@ template <typename saidx_t>
 static inline
 saidx_t *
 tr_median3(const saidx_t *ISAd, saidx_t *v1, saidx_t *v2, saidx_t *v3) {
-  saidx_t *t;
   if(ISAd[*v1] > ISAd[*v2]) { std::swap(v1, v2); }
   if(ISAd[*v2] > ISAd[*v3]) {
     if(ISAd[*v1] > ISAd[*v3]) { return v1; }
@@ -1020,7 +1022,6 @@ static inline
 saidx_t *
 tr_median5(const saidx_t *ISAd,
            saidx_t *v1, saidx_t *v2, saidx_t *v3, saidx_t *v4, saidx_t *v5) {
-  saidx_t *t;
   if(ISAd[*v2] > ISAd[*v3]) { std::swap(v2, v3); }
   if(ISAd[*v4] > ISAd[*v5]) { std::swap(v4, v5); }
   if(ISAd[*v2] > ISAd[*v4]) { std::swap(v2, v4); std::swap(v3, v5); }
@@ -1209,7 +1210,6 @@ tr_introsort(saidx_t *ISA, const saidx_t *ISAd,
              trbudget_t<saidx_t> *budget) {
   struct { const saidx_t *a; saidx_t *b, *c; int32_t d, e; }stack[libdivsufsort_config<saidx_t>::TR_STACKSIZE];
   saidx_t *a, *b, *c;
-  saidx_t t;
   saidx_t v, x = 0;
   saidx_t incr = ISAd - ISA;
   int32_t limit, next;
@@ -1967,3 +1967,7 @@ _compare(const uint8_t *T, saidx_t Tsize,
 //
 //   return 0;
 // }
+
+}
+
+#endif

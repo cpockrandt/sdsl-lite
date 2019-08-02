@@ -37,7 +37,7 @@ public:
 protected:
 	const int_vector<>* m_v; //!< Pointer to the rank supported bit_vector
     uint8_t t_b;
-    uint8_t t_v;
+    value_type t_v;
 	uint64_t even_mask;
 	uint64_t carry_select_mask;
 	std::vector<uint64_t> masks;
@@ -108,7 +108,7 @@ protected:
                         max_val = (*m_v)[i];
             }
 
-            t_v = 1ULL << t_b;//max_val + 1;
+            t_v = max_val + 1; // 1ULL << t_b
 
             even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
             carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);

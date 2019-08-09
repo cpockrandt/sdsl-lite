@@ -70,6 +70,7 @@ public:
 
 	explicit rank_support_int_v(const int_vector<>* v = nullptr, unsigned max_val = 0) : rank_support_int(v, max_val)
 	{
+	    static_assert(blocks_per_superblock > 1, "There must be at least two blocks per superblock!");
 		uint8_t const t_v_decr = t_v - 1; // max_val not needed because of t_v?
 
 		if (v == nullptr) {
@@ -86,28 +87,36 @@ public:
 		// uint32_t const bits_per_value{std::ceil(log2(max_val))};
 		constexpr uint64_t words_per_superblock = words_per_block * blocks_per_superblock;
 
-		uint64_t const values_per_word{64 / v->width()};
+		uint64_t const values_per_word{64ull / v->width()};
 		uint64_t const values_per_block{words_per_block * values_per_word};
 		uint64_t const values_per_superblock{blocks_per_superblock * values_per_block};
-		uint64_t const new_width{std::ceil(log2(values_per_superblock))};
+		uint64_t const new_width{static_cast<uint64_t>(std::ceil(log2(values_per_superblock)))};
 		m_block.width(new_width);
 		// TODO: could also set block width of superblocks. check running time impact!
-		std::cout << "Bits per value: " << (unsigned)v->width() << std::endl;
-		std::cout << "Values per word: " << values_per_word << std::endl;
-		std::cout << "Values per superblock: " << values_per_superblock << std::endl;
-		std::cout << "Block width: " << (unsigned)new_width << std::endl;
+        std::cout << "words_per_block: " << (unsigned)words_per_block << '\n'
+                  << "blocks_per_superblock: " << (unsigned)blocks_per_superblock << std::endl << '\n'
+		          << "Bits per value: " << (unsigned)v->width() << '\n'
+		          << "Values per word: " << values_per_word << '\n'
+		          << "Values per superblock: " << values_per_superblock << '\n'
+		          << "Block width: " << (unsigned)new_width << std::endl;
 
-		uint64_t const word_count = ((m_v->size() - 1) / values_per_word) + 1; // equivalent to ceil(m_v->size() / values_per_word)
+		// NOTE: number of elements is artificially increased because rank can be called on [size()]
+		uint64_t const word_count = ((m_v->size() - 1 + 1) / values_per_word) + 1; // equivalent to ceil(m_v->size() / values_per_word)
 		uint64_t const block_count = ((word_count - 1) / words_per_block) + 1; // equivalent to ceil(word_count / words_per_block)
 
-		size_type const block_size = (((block_count - 1) / blocks_per_superblock) + 1) * (blocks_per_superblock - 1) * t_v_decr; // ceil(v->size() / values_per_block) * t_v_decr
-		size_type const superblock_size = (((v->size() - 1) / values_per_superblock) + 1) * t_v_decr; // ceil(v->size() / values_per_superblock) * t_v_decr
-		std::cout << "t_v_decr: " << (unsigned)t_v_decr << std::endl;
-		std::cout << "Elements: " << v->size() << std::endl;
-		std::cout << "block count: " << block_count << std::endl;
-		std::cout << "word count: " << word_count << std::endl;
-		std::cout << "block_size: " << block_size << std::endl;
-		std::cout << "superblock_size: " << superblock_size << std::endl;
+		// for each superblock we only need `blocks_per_superblock-1` instead of `blocks_per_superblock` blocks.
+		// for the last superblock we can subtract the last unused blocks.
+        size_type const blocks_needed = (((block_count - 1) / blocks_per_superblock) + 1) * (blocks_per_superblock - 1) - ((blocks_per_superblock - (block_count % blocks_per_superblock)) % blocks_per_superblock);
+		size_type const block_size = blocks_needed * t_v_decr;
+
+		size_type const superblock_size = (((word_count - 1) / words_per_superblock) + 1) * t_v_decr; // ceil(word_count / words_per_superblock) * t_v_decr
+		std::cout << "t_v_decr: " << (unsigned)t_v_decr << '\n'
+		          << "Elements: " << v->size() << '\n'
+		          << "block count: " << block_count << '\n'
+		          << "word count: " << word_count << '\n'
+                  << "blocks_needed: " << blocks_needed << '\n'
+                  << "block_size: " << block_size << '\n'
+		          << "superblock_size: " << superblock_size << std::endl;
 		m_block.resize(block_size); // TODO: adjust
 		m_superblock.resize(superblock_size); // TODO: adjust
 
@@ -118,39 +127,53 @@ public:
 		for (uint64_t v = 0; v < t_v_decr; ++v)
 			m_superblock[v] = 0;
 
-		for (uint64_t word_id = 0, block_id = 0, superblock_id = t_v_decr; word_id < word_count; word_id += t_v_decr)
+		for (uint64_t word_id = 0, block_id = 0, superblock_id = t_v_decr; word_id < word_count; ++word_id)
 		{
-			// TODO: for loop missing over multiple words per block
 			for (uint64_t v = 0; v < t_v_decr; ++v)
 				buf_blocks[v] += full_word_prefix_rank(data, word_id, v);
 
-			if (word_id % words_per_block) // divisor is constexpr, i.e., modulo operation is expected to be cheap
+			// counted the values in the last word of the current block
+			if (word_id % words_per_block == (words_per_block - 1)) // divisor is constexpr, i.e., modulo operation is expected to be cheap
 			{
-				if (word_id % words_per_superblock != 0) // divisor is constexpr, i.e., modulo operation is expected to be cheap
-				{ // don't store block information for the last block in the superblock!
-					for (uint64_t v = 0; v < t_v_decr; ++v)
-						m_block[block_id + v] = buf_blocks[v];
-					block_id += t_v_decr;
-				}
-				else
-				{
-					for (uint64_t v = 0; v < t_v_decr; ++v)
-					{
-						buf_superblocks[v] += buf_blocks[v];
-						m_superblock[superblock_id + v] = buf_superblocks[v];
-						buf_blocks[v] = 0; // reset blocks
-					}
-					superblock_id += t_v_decr;
-				}
+                if (word_id % words_per_superblock != (words_per_superblock - 1)) // divisor is constexpr, i.e., modulo operation is expected to be cheap
+                {
+                    if (block_id < m_block.size()) // TODO: bloed
+                    {
+                        for (uint64_t v = 0; v < t_v_decr; ++v)
+                            m_block[block_id + v] = buf_blocks[v];
+                        block_id += t_v_decr;
+                    }
+                }
+                else
+                { // don't store block information for the last block in the superblock!
+                    if (superblock_id < m_superblock.size()) // TODO: bloed
+                    {
+                        for (uint64_t v = 0; v < t_v_decr; ++v)
+                        {
+                            buf_superblocks[v] += buf_blocks[v];
+                            m_superblock[superblock_id + v] = buf_superblocks[v];
+                            buf_blocks[v] = 0; // reset blocks
+                        }
+                    }
+                    superblock_id += t_v_decr;
+                }
 			}
 		}
 
         std::cout << "\nBlocks:\n";
-        for (uint64_t i = 0; i < m_block.size(); ++i)
-            std::cout << (unsigned)m_block[i] << ' ';
+        for (uint64_t i = 0; i < m_block.size(); i += t_v_decr)
+		{
+			for (uint64_t v = 0; v < t_v_decr; ++v)
+	            std::cout << (unsigned)m_block[i + v] << ' ';
+            std::cout << "| ";
+		}
         std::cout << "\nSuperBlocks:\n";
-        for (uint64_t i = 0; i < m_superblock.size(); ++i)
-            std::cout << (unsigned)m_superblock[i] << ' ';
+        for (uint64_t i = 0; i < m_superblock.size(); i += t_v_decr)
+		{
+			for (uint64_t v = 0; v < t_v_decr; ++v)
+            	std::cout << (unsigned)m_superblock[i + v] << ' ';
+            std::cout << "| ";
+		}
         std::cout << "\n\n";
 
 		// size_type basic_block_size = ((v->capacity() >> 9) + 1) * 2 * (t_v - 1);
@@ -248,6 +271,7 @@ public:
 	{
 		assert(m_v != nullptr);
 		assert(idx <= m_v->size());
+        assert(v <= t_v);
 
 		if (unlikely(v == t_v - 1)) // TODO: test effect of likely/unlikely
 			return idx;
@@ -270,11 +294,22 @@ public:
 
 		// superblock_id * (blocks_per_superblock - 1) + (word_id % words_per_block); // TODO: expensive!
 
-		size_type res = m_superblock[t_v_decr * superblock_id + v];
+        size_type res = m_superblock[t_v_decr * superblock_id + v];
 
-		uint16_t const block_id_in_superblock = block_id % blocks_per_superblock;
-		if (block_id_in_superblock != 0)
-			res += m_block[t_v_decr * (blocks_per_superblock - 1) * block_id_in_superblock + v];
+        uint16_t const block_id_in_superblock = block_id % blocks_per_superblock;
+        if (block_id_in_superblock > 0)
+            res += m_block[t_v_decr * superblock_id * (blocks_per_superblock - 1) + (block_id_in_superblock - 1)  * t_v_decr + v];
+
+        if (words_per_block > 1)
+        {
+            size_type const word_id = idx / values_per_word;
+            uint64_t w = word_id - (word_id % words_per_block);
+            while (w < word_id)
+            {
+                res += full_word_prefix_rank(m_v->data(), w, v);
+                ++w;
+            }
+        }
 
 		// TODO: loop for multiple words in a block
 		if (idx % values_per_block != 0)

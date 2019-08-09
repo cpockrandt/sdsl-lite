@@ -103,9 +103,10 @@ protected:
             t_b = m_v->width();
             if (max_val == 0)
             {
-                for (unsigned i = 0; i < m_v->size(); ++i)
-                    if ((*m_v)[i] > max_val)
-                        max_val = (*m_v)[i];
+                exit(15);
+                //for (unsigned i = 0; i < m_v->size(); ++i)
+                //    if ((*m_v)[i] > max_val)
+                //        max_val = (*m_v)[i];
             }
 
             t_v = max_val + 1; // 1ULL << t_b

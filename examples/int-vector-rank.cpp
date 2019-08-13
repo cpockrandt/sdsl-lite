@@ -57,11 +57,17 @@ int main()
     // test_int_vector<rank_support_int_scan>(4, 10000);
     //test_int_vector<rank_support_int_scan>(5, 10000); // does not work as expected since values are overlapping 64bit-words (we don't want that ...)
 
+    wt_ap<> wt;
+    construct(wt, "ACGTACGTACGT", 1);
+    
+
     std::cout << "Rank support v:\n";
     for (auto width : {2, 4, 8, 16})
     {
         for (uint64_t len = 0; len < 1000; ++len)
         {
+            test_int_vector<rank_support_int_v<3,10>>(3, 6, len);
+
             test_int_vector<rank_support_int_v<1,2>>(width, 3, len);
             test_int_vector<rank_support_int_v<1,3>>(width, 3, len);
             test_int_vector<rank_support_int_v<1,4>>(width, 3, len);

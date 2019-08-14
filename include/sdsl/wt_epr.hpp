@@ -12,7 +12,6 @@
 #include "bit_vectors.hpp"
 #include "rank_support.hpp"
 #include "rank_support_int.hpp"
-#include "int_vector_il.hpp"
 #include "select_support.hpp"
 #include "wt_helper.hpp"
 #include <vector>
@@ -35,7 +34,7 @@ namespace sdsl {
  *  @ingroup wt
  */
 template <class bit_vector_type       = int_vector<>,
-		  class rank_1_type   = rank_support_int_v,
+		  class rank_1_type   = rank_support_int_v<>,
 		  class t_tree_strat  = byte_tree<>
 		  >
 class wt_pc_epr {
@@ -61,7 +60,11 @@ private:
 
 	void construct_init_rank_select()
 	{
-		util::init_support(m_bv_rank, &m_bv);
+		// util::init_support(m_bv_rank, &m_bv);
+		// TODO: max_val
+        rank_1_type temp(&m_bv, 3);			 // generate a temporary support object
+        m_bv_rank = std::move(temp); // swap its content with the target object
+        m_bv_rank.set_vector(&m_bv);	 // set the support object's  pointer to x
 	}
 
 	// recursive internal version of the method interval_symbols

@@ -1,6 +1,8 @@
 #include <sdsl/vectors.hpp>
 #include <sdsl/rank_support_int.hpp>
 #include <sdsl/rank_support_int_scan.hpp>
+#include <sdsl/csa_wt.hpp>
+#include <sdsl/suffix_arrays.hpp>
 #include <iostream>
 
 using namespace sdsl;
@@ -57,9 +59,69 @@ int main()
     // test_int_vector<rank_support_int_scan>(4, 10000);
     //test_int_vector<rank_support_int_scan>(5, 10000); // does not work as expected since values are overlapping 64bit-words (we don't want that ...)
 
-    wt_ap<> wt;
-    construct(wt, "ACGTACGTACGT", 1);
-    
+    csa_wt<wt_blcd<>, 8, 8, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet> blcd;
+    csa_wt<wt_pc_epr<>, 8, 8, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet> epr;
+
+    auto const seed{1565824982/*time(NULL)*/};
+    std::cout << "Seed: " << seed << '\n';
+    srand(seed);
+
+    while (true)
+    {
+        int_vector<8> text;//{1, 2, 3, 1, 2, 3, 1, 2, 3};
+        int_vector<8> pattern;//{1, 2, 3};
+
+        uint64_t text_len{std::rand() % 10000};
+        uint64_t pattern_len{std::rand() % 15};
+        text.resize(text_len);
+        pattern.resize(pattern_len);
+
+        for (uint32_t i = 0; i < text_len; ++i)
+        {
+            text[i] = (std::rand() % 3) + 1; // no 0s allowed. produces 1, 2 or 3.
+            std::cout << (unsigned)text[i];
+        }
+        std::cout << std::endl;
+        for (uint32_t i = 0; i < pattern_len; ++i)
+        {
+            pattern[i] = (std::rand() % 3) + 1; // no 0s allowed. produces 1, 2 or 3.
+            std::cout << (unsigned)pattern[i];
+        }
+        std::cout << std::endl;
+
+        construct_im(blcd, text, 0);
+        construct_im(epr , text, 0);
+
+        uint64_t lb{0}, rb{blcd.size()-1};      //, rev_lb{0}, rev_rb{epr.size()-1};
+        // bidirectional_search(blcd, 'A', lb, rb, rev_lb, rev_rb);
+        std::cout << lb << "," << rb << '\t';
+        std::cout.flush();
+        for (int32_t i = pattern.size() - 1; i >= 0; --i)
+        {
+            if (!backward_search(blcd, lb, rb, pattern[i], lb, rb))
+                break;
+            std::cout << lb << "," << rb << '\t';
+            std::cout.flush();
+        }
+        std::cout << std::endl;
+
+        lb = 0;
+        rb = epr.size()-1;
+        std::cout << lb << "," << rb << '\t';
+        std::cout.flush();
+        for (int32_t i = pattern.size() - 1; i >= 0; --i)
+        {
+            if (!backward_search(epr, lb, rb, pattern[i], lb, rb))
+                break;
+            std::cout << lb << "," << rb << '\t';
+            std::cout.flush();
+        }
+        std::cout << std::endl << std::endl;
+
+        // return 0;
+    }
+
+    return 0;
 
     std::cout << "Rank support v:\n";
     for (auto width : {2, 4, 8, 16})

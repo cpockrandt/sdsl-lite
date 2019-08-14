@@ -244,7 +244,7 @@ public:
 		if (unlikely(v == 0))
 			return prefix_rank(idx, v);
 
-		return 0;
+		return prefix_rank(idx, v) - prefix_rank(idx, v - 1);
 
 		// uint64_t word_pos = (2 * (t_v - 1) * (((idx * t_b) >> 9))) + 2 * v;
 		// const uint64_t* p = m_basic_block.data() + word_pos; // 2*(idx*t_b/512) + 2*v

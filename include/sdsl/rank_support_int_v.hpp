@@ -47,6 +47,7 @@ private:
 	int_vector<64> m_superblock; // TODO: reduce width (at runtime)? benchmark space consumption and running time
 
 	static constexpr uint64_t values_per_word{static_cast<uint64_t>(64) / rank_support_int<alphabet_size>::t_b};
+	static constexpr uint32_t values_per_block{words_per_block * values_per_word};
 
 public:
 	explicit rank_support_int_v(const int_vector<>* v = nullptr) : rank_support_int<alphabet_size>(v)
@@ -65,13 +66,11 @@ public:
 			return;
 		}
 
-		constexpr uint64_t words_per_superblock = words_per_block * blocks_per_superblock;
-
-		uint64_t const values_per_block{words_per_block * values_per_word};
-		uint64_t const values_per_superblock{blocks_per_superblock * values_per_block};
-		uint64_t const new_width{ceil_log2(values_per_superblock)};
+		constexpr uint64_t words_per_superblock{words_per_block * blocks_per_superblock};
+		constexpr uint64_t values_per_superblock{blocks_per_superblock * values_per_block};
+		constexpr uint64_t new_width{ceil_log2(values_per_superblock)};
 		m_block.width(new_width);
-		// TODO: could also set block width of superblocks. check running time impact!
+
         // std::cout << "words_per_block: " << (unsigned)words_per_block << '\n'
         //           << "blocks_per_superblock: " << (unsigned)blocks_per_superblock << std::endl << '\n'
 		//           << "Bits per value: " << (unsigned)v->width() << '\n'
@@ -79,7 +78,7 @@ public:
 		//           << "Values per superblock: " << values_per_superblock << '\n'
 		//           << "Block width: " << (unsigned)new_width << std::endl;
 
-		// NOTE: number of elements is artificially increased because rank can be called on [size()]
+		// NOTE: number of elements is artificially increased by one because rank can be called on m_v[size()]
 		uint64_t const word_count = ((this->m_v->size() - 1 + 1) / values_per_word) + 1; // equivalent to ceil(m_v->size() / values_per_word)
 		uint64_t const block_count = ((word_count - 1) / words_per_block) + 1; // equivalent to ceil(word_count / words_per_block)
 
@@ -96,8 +95,8 @@ public:
         //           << "blocks_needed: " << blocks_needed << '\n'
         //           << "block_size: " << block_size << '\n'
 		//           << "superblock_size: " << superblock_size << std::endl;
-		m_block.resize(block_size); // TODO: adjust
-		m_superblock.resize(superblock_size); // TODO: adjust
+		m_block.resize(block_size);
+		m_superblock.resize(superblock_size);
 
 		uint64_t const * data = this->m_v->data();
 		std::vector<uint64_t> buf_blocks(t_v_decr, 0); // TODO: get rid of these objects
@@ -116,7 +115,7 @@ public:
 			{
                 if (word_id % words_per_superblock != (words_per_superblock - 1)) // divisor is constexpr, i.e., modulo operation is expected to be cheap
                 {
-                    if (block_id < m_block.size()) // TODO: bloed
+                    if (block_id < m_block.size()) // TODO: not a good design. rewrite to loop to eliminate if clause
                     {
                         for (uint64_t v = 0; v < t_v_decr; ++v)
                             m_block[block_id + v] = buf_blocks[v];
@@ -125,7 +124,7 @@ public:
                 }
                 else
                 { // don't store block information for the last block in the superblock!
-                    if (superblock_id < m_superblock.size()) // TODO: bloed
+                    if (superblock_id < m_superblock.size()) // TODO: not a good design. rewrite to loop to eliminate if clause
                     {
                         for (uint64_t v = 0; v < t_v_decr; ++v)
                         {
@@ -166,7 +165,6 @@ public:
 		assert(this->m_v != nullptr);
 		assert(idx <= this->m_v->size());
 
-		// TODO: optimize?
 		if (unlikely(v == 0))
 			return prefix_rank(idx, v);
 
@@ -181,29 +179,28 @@ public:
 		assert(idx <= this->m_v->size());
         assert(v <= this->t_v);
 
-		if (unlikely(v == this->t_v - 1)) // TODO: test effect of likely/unlikely
+		if (unlikely(v == this->t_v - 1))
 			return idx;
 
 		constexpr uint8_t t_v_decr{this->t_v - 1};
 
-		uint32_t const values_per_block{words_per_block * values_per_word};
+		size_type const block_id{idx / values_per_block};
+		size_type const superblock_id{block_id / blocks_per_superblock};
+        size_type const block_id_in_superblock{block_id % blocks_per_superblock};
 
-		// size_type const word_id = idx / values_per_word; // TODO: expensive!
-		size_type const block_id = idx / values_per_block;
-		size_type const superblock_id = block_id / blocks_per_superblock; // NOTE: former idx / values_per_superblock
+		// retrieve superblock value
+        size_type res{m_superblock[t_v_decr * superblock_id + v]};
 
-		// superblock_id * (blocks_per_superblock - 1) + (word_id % words_per_block); // TODO: expensive!
-
-        size_type res = m_superblock[t_v_decr * superblock_id + v];
-
-        uint16_t const block_id_in_superblock = block_id % blocks_per_superblock;
+		// retrieve block value
         if (block_id_in_superblock > 0)
             res += m_block[t_v_decr * superblock_id * (blocks_per_superblock - 1) + (block_id_in_superblock - 1)  * t_v_decr + v];
 
+		// compute in-block queries for all words before the in-block queries
+		// this only applies when multiple words are in one block
         if (words_per_block > 1)
         {
-            size_type const word_id = idx / values_per_word;
-            uint64_t w = word_id - (word_id % words_per_block);
+            size_type const word_id{idx / values_per_word};
+            uint64_t w{word_id - (word_id % words_per_block)};
             while (w < word_id)
             {
                 res += this->full_word_prefix_rank(this->m_v->data(), w, v);
@@ -211,6 +208,7 @@ public:
             }
         }
 
+		// compute in-block query
 		if (idx % values_per_block != 0)
 			res += this->word_prefix_rank(this->m_v->data(), idx, v);
 
@@ -222,8 +220,8 @@ public:
 	size_type
 	serialize(std::ostream& out, structure_tree_node* v = nullptr, std::string name = "") const
 	{
-		size_type			 written_bytes = 0;
 		structure_tree_node* child = structure_tree::add_child(v, name, util::class_name(*this));
+		size_type written_bytes = 0;
 		written_bytes += m_block.serialize(out, child, "prefix_block_counts");
 		written_bytes += m_superblock.serialize(out, child, "prefix_superblock_counts");
 		structure_tree::add_size(child, written_bytes);

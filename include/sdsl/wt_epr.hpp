@@ -351,6 +351,7 @@ public:
 		// 	smaller = m_bv_rank.prefix_rank(j, c-1) - m_bv_rank.prefix_rank(i, c-1);
 		// size_type rank = m_bv_rank.rank(i, c);
 
+		// TODO: write a function returning a pair for (i, c) and (i, c-1) and benchmark!
 		size_type smaller = 0;
 		size_type prefix_i_c = m_bv_rank.prefix_rank(i, c);
 		size_type prefix_i_c_1 = 0;
@@ -381,8 +382,9 @@ public:
 	t_ret_type lex_smaller_count(size_type i, value_type c) const
 	{
 		assert(i <= size());
-		size_type prefix_c_1 = m_bv_rank.prefix_rank(i, c - 1);
-		return t_ret_type{m_bv_rank.prefix_rank(i, c) - prefix_c_1, prefix_c_1};
+		// TODO: write a function returning a pair for (i, c) and (i, c-1) and benchmark!
+		size_type const prefix_count_smaller = m_bv_rank.prefix_rank(i, c - 1);
+		return t_ret_type{m_bv_rank.prefix_rank(i, c) - prefix_count_smaller, prefix_count_smaller};
 	}
 
 	//! Returns a const_iterator to the first element.
@@ -396,7 +398,7 @@ public:
 	serialize(std::ostream& out, structure_tree_node* v = nullptr, std::string name = "") const
 	{
 		structure_tree_node* child = structure_tree::add_child(v, name, util::class_name(*this));
-		size_type			 written_bytes = 0;
+		size_type written_bytes = 0;
 		written_bytes += write_member(m_size, out, child, "size");
 		written_bytes += write_member(m_sigma, out, child, "sigma");
 		written_bytes += m_bv.serialize(out, child, "bv");

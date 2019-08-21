@@ -9,7 +9,7 @@ using namespace sdsl;
 using namespace std;
 
 template <typename rank_t>
-void test_int_vector(uint8_t const width, uint8_t const max_val, uint32_t const size)
+void test_int_vector(uint8_t const width, uint32_t const size)
 {
     int_vector<0> iv;
     iv.width(width);
@@ -17,8 +17,9 @@ void test_int_vector(uint8_t const width, uint8_t const max_val, uint32_t const 
     for (uint32_t i = 0; i < size; ++i)
         iv.push_back(i % 4);
 
-    rank_t rb(&iv, max_val);
-    for (unsigned v = 0; v < max_val; ++v)
+    rank_t rb(&iv);
+    constexpr uint8_t alphabet_size = 4; // TODO: remove
+    for (unsigned v = 0; v < alphabet_size; ++v)
     {
         unsigned cnt = 0;
         for (unsigned i = 0; i < iv.size() + 1; ++i)
@@ -54,13 +55,19 @@ int main()
 {
     // TODO: test with random data, short data, edge cases (multiple of 32 chars, =/- 1 for DNA)
 
+    // for (uint32_t i = 1; i < 34; ++i)
+    // {
+    //     std::cout << i << '\t' << ceil_log2(i) << '\t' << std::ceil(std::log2(i)) << '\n';
+    // }
+    // return 0;
+
     // std::cout << "Rank support scan:\n";
     // test_int_vector<rank_support_int_scan>(2, 10000);
     // test_int_vector<rank_support_int_scan>(4, 10000);
     //test_int_vector<rank_support_int_scan>(5, 10000); // does not work as expected since values are overlapping 64bit-words (we don't want that ...)
 
     csa_wt<wt_blcd<>, 8, 8, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet> blcd;
-    csa_wt<wt_pc_epr<>, 8, 8, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet> epr;
+    csa_wt<wt_pc_epr<4>, 8, 8, sa_order_sa_sampling<>, isa_sampling<>, byte_alphabet> epr;
 
     auto const seed{1565824982/*time(NULL)*/};
     std::cout << "Seed: " << seed << '\n';
@@ -128,26 +135,25 @@ int main()
     {
         for (uint64_t len = 0; len < 1000; ++len)
         {
-            test_int_vector<rank_support_int_v<3,10>>(3, 6, len);
+            // alphabet_size = 4
+            test_int_vector<rank_support_int_v<4, 1, 2>>(width, len);
+            test_int_vector<rank_support_int_v<4, 1, 3>>(width, len);
+            test_int_vector<rank_support_int_v<4, 1, 4>>(width, len);
+            test_int_vector<rank_support_int_v<4, 1, 5>>(width, len);
 
-            test_int_vector<rank_support_int_v<1,2>>(width, 3, len);
-            test_int_vector<rank_support_int_v<1,3>>(width, 3, len);
-            test_int_vector<rank_support_int_v<1,4>>(width, 3, len);
-            test_int_vector<rank_support_int_v<1,5>>(width, 3, len);
+            test_int_vector<rank_support_int_v<4, 2, 2>>(width, len);
+            test_int_vector<rank_support_int_v<4, 2, 3>>(width, len);
+            test_int_vector<rank_support_int_v<4, 2, 4>>(width, len);
+            test_int_vector<rank_support_int_v<4, 2, 5>>(width, len);
 
-            test_int_vector<rank_support_int_v<2,2>>(width, 3, len);
-            test_int_vector<rank_support_int_v<2,3>>(width, 3, len);
-            test_int_vector<rank_support_int_v<2,4>>(width, 3, len);
-            test_int_vector<rank_support_int_v<2,5>>(width, 3, len);
-
-            test_int_vector<rank_support_int_v<3,2>>(width, 3, len);
-            test_int_vector<rank_support_int_v<3,3>>(width, 3, len);
-            test_int_vector<rank_support_int_v<3,4>>(width, 3, len);
-            test_int_vector<rank_support_int_v<3,5>>(width, 3, len);
+            test_int_vector<rank_support_int_v<4, 3, 2>>(width, len);
+            test_int_vector<rank_support_int_v<4, 3, 3>>(width, len);
+            test_int_vector<rank_support_int_v<4, 3, 4>>(width, len);
+            test_int_vector<rank_support_int_v<4, 3, 5>>(width, len);
         }
     }
 
-    // test_int_vector<rank_support_int_v<1,3>>(2, 100);
-    // test_int_vector<rank_support_int_v<1,3>>(4, 100);
+    // test_int_vector<rank_support_int_v<4, 1, 3>>(2, 100);
+    // test_int_vector<rank_support_int_v<4, 1, 3>>(4, 100);
     //test_int_vector<rank_support_int_v>(5, 10000); // does not work as expected since values are overlapping 64bit-words (we don't want that ...)
 }

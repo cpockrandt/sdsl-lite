@@ -33,9 +33,10 @@ namespace sdsl {
  *
  *  @ingroup wt
  */
-template <class bit_vector_type       = int_vector<>,
-		  class rank_1_type   = rank_support_int_v<>,
-		  class t_tree_strat  = byte_tree<>
+template <uint8_t alphabet_size,
+		  class bit_vector_type  = int_vector<>,
+		  class rank_1_type      = rank_support_int_v<alphabet_size>,
+		  class t_tree_strat     = byte_tree<>
 		  >
 class wt_pc_epr {
 public:
@@ -61,8 +62,7 @@ private:
 	void construct_init_rank_select()
 	{
 		// util::init_support(m_bv_rank, &m_bv);
-		// TODO: max_val
-        rank_1_type temp(&m_bv, 3);			 // generate a temporary support object
+        rank_1_type temp(&m_bv);			 // generate a temporary support object
         m_bv_rank = std::move(temp); // swap its content with the target object
         m_bv_rank.set_vector(&m_bv);	 // set the support object's  pointer to x
 	}

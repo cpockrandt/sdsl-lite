@@ -28,6 +28,18 @@ namespace sdsl {
 //! The base class of classes supporting rank_queries for a sdsl::int_vector in constant time.
 /*!
 */
+
+constexpr size_t floor_log2(size_t const n)
+{
+    return (n == 1) ? 0 : 1 + floor_log2(n >> 1);
+}
+
+constexpr size_t ceil_log2(size_t const n)
+{
+    return (n == 1) ? 0 : floor_log2(n - 1) + 1;
+}
+
+template <uint8_t alphabet_size>
 class rank_support_int {
 
 public:
@@ -35,25 +47,26 @@ public:
 	typedef typename int_vector<>::value_type value_type;
 
 protected:
-	const int_vector<>* m_v; //!< Pointer to the rank supported bit_vector
-    uint8_t t_b;
-    value_type t_v;
-	uint64_t even_mask;
-	uint64_t carry_select_mask;
-	std::vector<uint64_t> masks;
-
     template <typename uintX_t>
-    uintX_t bm_rec(const uintX_t w, const uint8_t length, const uint8_t max_length) const
+    static constexpr uintX_t bm_rec(const uintX_t w, const uint8_t length, const uint8_t max_length)
     {
         return (length >= max_length) ? w : bm_rec(w | (w << length), length << 1, max_length);
     }
+
+protected:
+	const int_vector<>* m_v; //!< Pointer to the rank supported bit_vector
+    static constexpr uint8_t t_v{alphabet_size};
+    static constexpr uint8_t t_b{ceil_log2(alphabet_size)};
+	static constexpr uint64_t even_mask{bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64)};
+	static constexpr uint64_t carry_select_mask{bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64)};
+	uint64_t masks[alphabet_size]; // TODO: make constexpr
 
     uint64_t set_positions(uint64_t w, const value_type v) const
     {
         // uint64_t res = (masks[v] - (even_mask & w)) & carry_select_mask;
         // res |= ((masks[v] - (even_mask & (w >> t_b))) & carry_select_mask) << 1;
-        uint64_t w_even = even_mask & w;
-        uint64_t w_odd = even_mask & (w >> t_b);
+        uint64_t const w_even = even_mask & w;
+        uint64_t const w_odd = even_mask & (w >> t_b);
         uint64_t res = ((masks[v] - w_even) & ~(masks[v - 1] - w_even)) & carry_select_mask;
         res |= (((masks[v] - w_odd) & ~(masks[v-1] - w_odd)) & carry_select_mask) << 1;
         return res;
@@ -69,53 +82,45 @@ protected:
     // assumptions?
     uint32_t word_rank(const uint64_t* data, const size_type idx, const value_type v) const
     {
-        size_type bit_pos = idx * t_b;
-        uint64_t w = *(data + (bit_pos >> 6));
+        size_type const bit_pos = idx * t_b;
+        uint64_t const w = *(data + (bit_pos >> 6));
         return bits::cnt(set_positions(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
     }
 
     // assumptions?
     uint32_t full_word_rank(const uint64_t* data, const size_type word_pos, const value_type v) const
     {
-        uint64_t w = *(data + word_pos);
+        uint64_t const w = *(data + word_pos);
         return bits::cnt(set_positions(w, v));
     }
 
     // assumptions?
     uint32_t word_prefix_rank(const uint64_t* data, const size_type idx, const value_type v) const
     {
-        size_type bit_pos = idx * t_b;
-        uint64_t w = *(data + (bit_pos >> 6));
+        size_type const bit_pos = idx * t_b;
+        uint64_t const w = *(data + (bit_pos >> 6));
         return bits::cnt(set_positions_prefix(w, v) & bits::lo_set[(bit_pos & 0x3F) + 1]);
     }
 
     // assumptions?
     uint32_t full_word_prefix_rank(const uint64_t* data, const size_type word_pos, const value_type v) const
     {
-        uint64_t w = *(data + word_pos);
+        uint64_t const w = *(data + word_pos);
         return bits::cnt(set_positions_prefix(w, v));
     }
 
-    void init(const int_vector<>* v, unsigned max_val)
+    void init(const int_vector<>* v)
     {
         if (v != nullptr) {
+			assert(t_b == v->width());
             m_v = v;
-            t_b = m_v->width();
-            if (max_val == 0)
-            {
-                exit(15);
-                //for (unsigned i = 0; i < m_v->size(); ++i)
-                //    if ((*m_v)[i] > max_val)
-                //        max_val = (*m_v)[i];
-            }
 
-            t_v = max_val + 1; // 1ULL << t_b
+            // t_b = m_v->width();
+            // t_v = alphabet_size;
+            // even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
+            // carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);
 
-            even_mask = bm_rec<uint64_t>(bits::lo_set[t_b], t_b * 2, 64);
-            carry_select_mask = bm_rec<uint64_t>(1ULL << t_b, t_b * 2, 64);
-
-            masks.resize(t_v);
-            for (value_type v = 0; v < t_v; ++v)
+            for (value_type v = 0; v < alphabet_size; ++v)
             {
                 masks[v] = v;
                 for (uint8_t i = t_b * 2; i < 64; i <<= 1)
@@ -123,20 +128,16 @@ protected:
             }
 
             uint64_t tmp_carry = masks[1];
-            for (value_type v = 0; v < t_v; ++v)
+            for (value_type v = 0; v < alphabet_size; ++v)
                 masks[v] |= tmp_carry << t_b;
-
-            masks.shrink_to_fit();
         }
     }
-
-
 
 public:
 	//! Constructor
 	/*! \param v The supported bit_vector.
          */
-	rank_support_int(const int_vector<>* v = nullptr, unsigned max_val = 3); // TODO: two separate constructors?
+	rank_support_int(const int_vector<>* v = nullptr);
 	//! Copy constructor
 	rank_support_int(const rank_support_int&) = default;
 	rank_support_int(rank_support_int&&)	  = default;
@@ -179,11 +180,11 @@ public:
 	virtual void set_vector(const int_vector<>* v = nullptr) = 0;
 };
 
-inline rank_support_int::rank_support_int(const int_vector<>* v, unsigned max_val)
+template <uint8_t alphabet_type>
+inline rank_support_int<alphabet_type>::rank_support_int(const int_vector<>* v)
 {
-    init(v, max_val);
+    init(v);
 }
-
 
 // struct rank_support_int_trait {
 // protected:

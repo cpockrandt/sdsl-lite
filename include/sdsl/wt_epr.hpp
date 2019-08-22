@@ -416,6 +416,25 @@ public:
 		m_bv_rank.load(in, &m_bv);
 	}
 
+	template <typename archive_t>
+	void CEREAL_SAVE_FUNCTION_NAME(archive_t & ar) const
+	{
+		ar(CEREAL_NVP(m_size));
+		ar(CEREAL_NVP(m_sigma));
+		ar(CEREAL_NVP(m_bv));
+		ar(CEREAL_NVP(m_bv_rank));
+	}
+
+	template <typename archive_t>
+	void CEREAL_LOAD_FUNCTION_NAME(archive_t & ar)
+	{
+		ar(CEREAL_NVP(m_size));
+		ar(CEREAL_NVP(m_sigma));
+		ar(CEREAL_NVP(m_bv));
+		ar(CEREAL_NVP(m_bv_rank));
+		m_bv_rank.set_vector(&m_bv);
+	}
+
 	//! Returns for a symbol c the next larger or equal symbol in the WT.
 	/*! \param c the symbol
          *  \return A pair. The first element of the pair consititues if

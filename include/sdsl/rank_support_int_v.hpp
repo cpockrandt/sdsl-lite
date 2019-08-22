@@ -236,6 +236,20 @@ public:
 		this->init(v);
 	}
 
+	template <typename archive_t>
+	void CEREAL_SAVE_FUNCTION_NAME(archive_t & ar) const
+	{
+		ar(CEREAL_NVP(m_block));
+		ar(CEREAL_NVP(m_superblock));
+	}
+
+	template <typename archive_t>
+	void CEREAL_LOAD_FUNCTION_NAME(archive_t & ar)
+	{
+		ar(CEREAL_NVP(m_block));
+		ar(CEREAL_NVP(m_superblock));
+	}
+
 	void set_vector(const int_vector<>* v = nullptr) { this->m_v = v; }
 };
 

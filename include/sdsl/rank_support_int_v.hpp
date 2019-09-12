@@ -250,7 +250,11 @@ public:
 		ar(CEREAL_NVP(m_superblock));
 	}
 
-	void set_vector(const int_vector<>* v = nullptr) { this->m_v = v; }
+	void set_vector(const int_vector<>* v = nullptr)
+	{
+		this->m_v = v;
+		this->init(v);
+	}
 };
 
 } // end namespace sdsl

@@ -11,13 +11,16 @@ using namespace std;
 template <typename rank_t>
 void test_int_vector(uint8_t const width, uint32_t const size)
 {
-    int_vector<0> iv;
-    iv.width(width);
-    //iv = {0,1,2,3,0,1,2,3}; // does not work because it sets the width to 64
-    for (uint32_t i = 0; i < size; ++i)
-        iv.push_back(i % 4);
+    {
+        int_vector<0> iv;
+        iv.width(width);
+        //iv = {0,1,2,3,0,1,2,3}; // does not work because it sets the width to 64
+        for (uint32_t i = 0; i < size; ++i)
+            iv.push_back(i % 4);
 
-    rank_t rb(&iv);
+        rank_t rb(&iv);
+    }
+
     constexpr uint8_t alphabet_size = 4; // TODO: remove
     for (unsigned v = 0; v < alphabet_size; ++v)
     {
